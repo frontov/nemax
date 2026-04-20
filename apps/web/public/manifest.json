@@ -1,0 +1,9 @@
+{
+  "name": "family-chat",
+  "short_name": "Family Chat",
+  "display": "standalone",
+  "start_url": "/",
+  "background_color": "#f5f1e8",
+  "theme_color": "#e36d4c",
+  "icons": []
+}

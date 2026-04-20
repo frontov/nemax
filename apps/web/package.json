@@ -1,0 +1,26 @@
+{
+  "name": "@family-chat/web",
+  "private": true,
+  "scripts": {
+    "build": "next build",
+    "dev": "next dev",
+    "lint": "tsc --noEmit -p tsconfig.json",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@family-chat/shared": "workspace:*",
+    "@family-chat/ui": "workspace:*",
+    "next": "^15.0.4",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/qrcode": "^1.5.5",
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "typescript": "^5.7.2"
+  }
+}

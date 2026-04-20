@@ -1,0 +1,13 @@
+{
+  "extends": "../../packages/config/typescript/next.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@family-chat/shared/*": ["../../packages/shared/src/*"],
+      "@family-chat/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules"]
+}

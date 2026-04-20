@@ -1,0 +1,17 @@
+{
+  "name": "family-chat",
+  "private": true,
+  "packageManager": "pnpm@10.11.0",
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "lint": "turbo run lint",
+    "prisma:generate": "pnpm --filter @family-chat/api prisma:generate",
+    "prisma:migrate:dev": "pnpm --filter @family-chat/api prisma:migrate:dev",
+    "seed": "pnpm --filter @family-chat/api seed",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.12"
+  }
+}

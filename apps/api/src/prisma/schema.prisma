@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  displayName         String
+  status              String               @default("active")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  lastSeenAt          DateTime?
+  ownedFamilies       Family[]             @relation("FamilyOwner")
+  memberships         FamilyMember[]
+  devices             Device[]
+  sessions            Session[]
+  messages            Message[]            @relation("MessageSender")
+  createdInvites      Invite[]             @relation("InviteCreator")
+  pushes              PushSubscription[]
+  notificationSettings NotificationSetting[]
+  auditLogs           AuditLog[]           @relation("AuditLogUser")
+  actorAuditLogs      AuditLog[]           @relation("AuditLogActor")
+  readStates          FamilyReadState[]
+}
+
+model Family {
+  id           String            @id @default(uuid())
+  name         String
+  ownerUserId  String
+  owner        User              @relation("FamilyOwner", fields: [ownerUserId], references: [id])
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  members      FamilyMember[]
+  invites      Invite[]
+  messages     Message[]
+  readStates   FamilyReadState[]
+}
+
+model FamilyMember {
+  id         String    @id @default(uuid())
+  familyId   String
+  userId     String
+  role       String    @default("member")
+  createdAt  DateTime  @default(now())
+  removedAt  DateTime?
+  family     Family    @relation(fields: [familyId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+
+  @@unique([familyId, userId])
+}
+
+model Device {
+  id            String              @id @default(uuid())
+  userId        String
+  familyId      String?
+  deviceName    String
+  platform      String
+  browserName   String?
+  userAgentHash String?
+  isTrusted     Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  lastSeenAt    DateTime?
+  revokedAt     DateTime?
+  user          User                @relation(fields: [userId], references: [id])
+  sessions      Session[]
+  pushes        PushSubscription[]
+}
+
+model Session {
+  id               String    @id @default(uuid())
+  userId           String
+  deviceId         String
+  sessionTokenHash String
+  createdAt        DateTime  @default(now())
+  lastRotatedAt    DateTime?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  ipCreated        String?
+  ipLastSeen       String?
+  user             User      @relation(fields: [userId], references: [id])
+  device           Device    @relation(fields: [deviceId], references: [id])
+}
+
+model Invite {
+  id              String    @id @default(uuid())
+  familyId        String
+  createdByUserId String
+  codeHash        String
+  role            String    @default("member")
+  maxUses         Int       @default(1)
+  usedCount       Int       @default(0)
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  family          Family    @relation(fields: [familyId], references: [id])
+  createdBy       User      @relation("InviteCreator", fields: [createdByUserId], references: [id])
+}
+
+model Message {
+  id               String        @id @default(uuid())
+  familyId         String
+  senderUserId     String
+  type             String        @default("text")
+  text             String?
+  replyToMessageId String?
+  clientTempId     String?
+  createdAt        DateTime      @default(now())
+  editedAt         DateTime?
+  deletedAt        DateTime?
+  family           Family        @relation(fields: [familyId], references: [id])
+  sender           User          @relation("MessageSender", fields: [senderUserId], references: [id])
+  replyToMessage   Message?      @relation("MessageReplies", fields: [replyToMessageId], references: [id])
+  replies          Message[]     @relation("MessageReplies")
+  attachments      Attachment[]
+  readStates       FamilyReadState[] @relation("LastReadMessage")
+}
+
+model FamilyReadState {
+  id                String    @id @default(uuid())
+  familyId          String
+  userId            String
+  lastReadMessageId String?
+  lastReadAt        DateTime?
+  family            Family    @relation(fields: [familyId], references: [id])
+  user              User      @relation(fields: [userId], references: [id])
+  lastReadMessage   Message?  @relation("LastReadMessage", fields: [lastReadMessageId], references: [id])
+
+  @@unique([familyId, userId])
+}
+
+model Attachment {
+  id           String    @id @default(uuid())
+  messageId    String
+  storageKey   String
+  originalName String
+  mimeType     String
+  sizeBytes    BigInt
+  width        Int?
+  height       Int?
+  createdAt    DateTime  @default(now())
+  message      Message   @relation(fields: [messageId], references: [id])
+}
+
+model PushSubscription {
+  id          String    @id @default(uuid())
+  deviceId    String
+  userId      String
+  endpoint    String    @unique
+  p256dh      String
+  auth        String
+  createdAt   DateTime  @default(now())
+  lastUsedAt  DateTime?
+  revokedAt   DateTime?
+  device      Device    @relation(fields: [deviceId], references: [id])
+  user        User      @relation(fields: [userId], references: [id])
+}
+
+model NotificationSetting {
+  id             String    @id @default(uuid())
+  userId         String
+  familyId       String
+  pushEnabled    Boolean   @default(true)
+  showPreview    Boolean   @default(true)
+  muteUntil      DateTime?
+  quietHoursFrom String?
+  quietHoursTo   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           User      @relation(fields: [userId], references: [id])
+
+  @@unique([userId, familyId])
+}
+
+model AuditLog {
+  id           String    @id @default(uuid())
+  familyId     String?
+  userId       String?
+  actorUserId  String?
+  eventType    String
+  payloadJson  Json
+  createdAt    DateTime  @default(now())
+  user         User?     @relation("AuditLogUser", fields: [userId], references: [id])
+  actorUser    User?     @relation("AuditLogActor", fields: [actorUserId], references: [id])
+}
