@@ -6,8 +6,7 @@ services:
     ports: []
 
   minio:
-    ports:
-      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    ports: []
 
   nginx:
     ports:

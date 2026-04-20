@@ -32,6 +32,11 @@ The domain is prefilled in punycode form:
 
 - `xn--80ajvc7b.xn--p1acf` = `немах.рус`
 
+Production override notes:
+
+- `docker-compose.prod.yml` does not publish PostgreSQL, Redis, or MinIO ports.
+- The app is exposed internally on `127.0.0.1:8081` and is expected to sit behind Caddy or another reverse proxy.
+
 ## 4. Start the stack
 
 ```bash
