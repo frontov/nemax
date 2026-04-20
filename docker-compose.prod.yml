@@ -1,0 +1,14 @@
+services:
+  postgres:
+    ports: []
+
+  redis:
+    ports: []
+
+  minio:
+    ports:
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+
+  nginx:
+    ports:
+      - "${NGINX_PORT:-8081}:80"

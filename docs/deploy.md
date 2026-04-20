@@ -35,15 +35,15 @@ The domain is prefilled in punycode form:
 ## 4. Start the stack
 
 ```bash
-docker compose up -d --build
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 ```
 
 ## 5. Verify
 
 ```bash
-curl -I http://127.0.0.1
-curl http://127.0.0.1/api/health
+curl -I http://127.0.0.1:8081
+curl http://127.0.0.1:8081/api/health
 ```
 
 ## 6. Update later
@@ -51,5 +51,5 @@ curl http://127.0.0.1/api/health
 ```bash
 cd /opt/nemax
 git pull
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 ```
