@@ -51,6 +51,31 @@ export class FamiliesService {
     };
   }
 
+  async createFamilyForExistingUser(sessionContext: SessionContext, input: CreateFamilyDto) {
+    if (!input.familyName.trim()) {
+      throw new BadRequestException("Family name is required");
+    }
+
+    const result = await this.familiesRepository.createFamilyForExistingUser({
+      userId: sessionContext.user.id,
+      deviceId: sessionContext.device.id,
+      familyName: input.familyName.trim(),
+    });
+
+    await this.auditService.log({
+      familyId: result.family.id,
+      userId: result.user.id,
+      actorUserId: result.user.id,
+      eventType: "family.created",
+      payloadJson: {
+        familyId: result.family.id,
+        memberId: result.member.id,
+      },
+    });
+
+    return result;
+  }
+
   async setActiveFamily(sessionContext: SessionContext, input: SetActiveFamilyDto) {
     const membership = await this.familiesRepository.setActiveFamily({
       userId: sessionContext.user.id,

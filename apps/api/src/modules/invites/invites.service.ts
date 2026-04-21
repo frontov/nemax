@@ -142,8 +142,43 @@ export class InvitesService {
     };
   }
 
-  async joinInvite(code: string, input: JoinInviteDto, ipAddress?: string | null) {
+  async joinInvite(
+    code: string,
+    input: JoinInviteDto,
+    ipAddress?: string | null,
+    sessionContext?: SessionContext | null,
+  ) {
     const codeHash = this.hashInviteCode(code);
+
+    if (sessionContext) {
+      const result = await this.invitesRepository.acceptInviteForExistingUser({
+        codeHash,
+        userId: sessionContext.user.id,
+        deviceId: sessionContext.device.id,
+      });
+
+      if (!result) {
+        throw new BadRequestException("Invite expired or exhausted");
+      }
+
+      await this.auditService.log({
+        familyId: result.invite.familyId,
+        userId: result.user.id,
+        actorUserId: result.user.id,
+        eventType: "invite.joined",
+        payloadJson: {
+          inviteId: result.invite.id,
+          memberId: result.member.id,
+        },
+      });
+
+      return {
+        ...result,
+        family: result.invite.family,
+        sessionToken: null,
+      };
+    }
+
     const invite = await this.invitesRepository.findActiveInvite(codeHash);
 
     if (!invite) {
@@ -186,7 +221,7 @@ export class InvitesService {
     };
   }
 
-  async joinInviteWithToken(token: string, ipAddress?: string | null) {
+  async joinInviteWithToken(token: string, ipAddress?: string | null, sessionContext?: SessionContext | null) {
     const payload = this.parseDirectJoinToken(token);
 
     return this.joinInvite(
@@ -197,6 +232,7 @@ export class InvitesService {
         platform: payload.platform,
       },
       ipAddress,
+      sessionContext,
     );
   }
 }

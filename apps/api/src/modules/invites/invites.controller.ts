@@ -4,7 +4,7 @@ import { CurrentSession } from "../../common/decorators/current-session.decorato
 import { createRateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { SessionGuard } from "../../common/guards/session.guard";
 import { AuthSessionService } from "../auth/auth.session.service";
-import type { SessionContext } from "../auth/auth.service";
+import { AuthService, type SessionContext } from "../auth/auth.service";
 import { AuthCookieService } from "../auth/auth.cookie.service";
 import { CreateInviteDto } from "./dto/create-invite.dto";
 import { JoinInviteDto } from "./dto/join-invite.dto";
@@ -16,6 +16,7 @@ export class InvitesController {
     private readonly invitesService: InvitesService,
     private readonly authSessionService: AuthSessionService,
     private readonly authCookieService: AuthCookieService,
+    private readonly authService: AuthService,
   ) {}
 
   @UseGuards(SessionGuard)
@@ -45,8 +46,15 @@ export class InvitesController {
     @Body() body: JoinInviteDto,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.invitesService.joinInvite(code, body, response.req.ip);
-    response.setHeader("Set-Cookie", this.authCookieService.createSessionCookie(result.sessionToken));
+    const sessionContext = await this.authService.resolveSessionFromRequest(response.req);
+    const result = await this.invitesService.joinInvite(code, body, response.req.ip, sessionContext);
+
+    if (result.sessionToken) {
+      response.setHeader("Set-Cookie", this.authCookieService.createSessionCookie(result.sessionToken));
+    } else if (sessionContext) {
+      const rotated = await this.authSessionService.rotateSession(sessionContext.session.id, response.req.ip);
+      response.setHeader("Set-Cookie", this.authCookieService.createSessionCookie(rotated.token));
+    }
 
     return {
       user: result.user,

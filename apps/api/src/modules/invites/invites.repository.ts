@@ -127,4 +127,117 @@ export class InvitesRepository {
       return { user, member, device, session, invite };
     });
   }
+
+  async acceptInviteForExistingUser(input: {
+    codeHash: string;
+    userId: string;
+    deviceId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const invite = await tx.invite.findFirst({
+        where: {
+          codeHash: input.codeHash,
+          revokedAt: null,
+          expiresAt: {
+            gt: new Date(),
+          },
+        },
+        include: {
+          family: true,
+        },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+
+      if (!invite) {
+        return null;
+      }
+
+      const existingMember = await tx.familyMember.findUnique({
+        where: {
+          familyId_userId: {
+            familyId: invite.familyId,
+            userId: input.userId,
+          },
+        },
+      });
+
+      if (existingMember?.removedAt === null) {
+        await tx.device.update({
+          where: {
+            id: input.deviceId,
+          },
+          data: {
+            familyId: invite.familyId,
+          },
+        });
+
+        const user = await tx.user.findUniqueOrThrow({
+          where: {
+            id: input.userId,
+          },
+        });
+
+        return { user, member: existingMember, invite };
+      }
+
+      const claimed = await tx.invite.updateMany({
+        where: {
+          id: invite.id,
+          revokedAt: null,
+          expiresAt: {
+            gt: new Date(),
+          },
+          usedCount: {
+            lt: invite.maxUses,
+          },
+        },
+        data: {
+          usedCount: {
+            increment: 1,
+          },
+        },
+      });
+
+      if (claimed.count !== 1) {
+        return null;
+      }
+
+      const member = existingMember
+        ? await tx.familyMember.update({
+            where: {
+              id: existingMember.id,
+            },
+            data: {
+              removedAt: null,
+              role: invite.role,
+            },
+          })
+        : await tx.familyMember.create({
+            data: {
+              familyId: invite.familyId,
+              userId: input.userId,
+              role: invite.role,
+            },
+          });
+
+      await tx.device.update({
+        where: {
+          id: input.deviceId,
+        },
+        data: {
+          familyId: invite.familyId,
+        },
+      });
+
+      const user = await tx.user.findUniqueOrThrow({
+        where: {
+          id: input.userId,
+        },
+      });
+
+      return { user, member, invite };
+    });
+  }
 }

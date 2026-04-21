@@ -62,6 +62,46 @@ export class FamiliesRepository {
     });
   }
 
+  async createFamilyForExistingUser(input: {
+    userId: string;
+    deviceId: string;
+    familyName: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUniqueOrThrow({
+        where: {
+          id: input.userId,
+        },
+      });
+
+      const family = await tx.family.create({
+        data: {
+          name: input.familyName,
+          ownerUserId: input.userId,
+        },
+      });
+
+      const member = await tx.familyMember.create({
+        data: {
+          familyId: family.id,
+          userId: input.userId,
+          role: "owner",
+        },
+      });
+
+      await tx.device.update({
+        where: {
+          id: input.deviceId,
+        },
+        data: {
+          familyId: family.id,
+        },
+      });
+
+      return { user, family, member };
+    });
+  }
+
   async setActiveFamily(input: {
     userId: string;
     deviceId: string;
