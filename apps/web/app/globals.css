@@ -291,9 +291,11 @@ button:hover {
 
 .chatShell {
   --chat-shell-bg: #eef3f8;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   height: min(80vh, 900px);
+  min-height: 0;
   padding: 10px;
   border: 1px solid rgba(74, 96, 122, 0.1);
   border-radius: 28px;
@@ -309,13 +311,14 @@ button:hover {
 .chatScroll {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 2px 4px;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
 }
 
 .chatScroll::-webkit-scrollbar {
