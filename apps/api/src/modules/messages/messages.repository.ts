@@ -11,6 +11,7 @@ export class MessagesRepository {
     replyToMessage: {
       include: {
         sender: true,
+        attachments: true,
       },
     },
   } as const;
@@ -46,6 +47,14 @@ export class MessagesRepository {
     text: string;
     replyToMessageId?: string;
     clientTempId?: string;
+    attachment?: {
+      storageKey: string;
+      originalName: string;
+      mimeType: string;
+      sizeBytes: bigint;
+      width?: number | null;
+      height?: number | null;
+    };
   }) {
     return this.prisma.$transaction(async (tx) => {
       const message = await tx.message.create({
@@ -56,6 +65,11 @@ export class MessagesRepository {
           text: input.text,
           replyToMessageId: input.replyToMessageId,
           clientTempId: input.clientTempId,
+          attachments: input.attachment
+            ? {
+                create: input.attachment,
+              }
+            : undefined,
         },
         include: this.messageInclude,
       });

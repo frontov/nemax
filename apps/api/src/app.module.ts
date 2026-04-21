@@ -6,6 +6,7 @@ import pushConfig from "./config/push.config";
 import redisConfig from "./config/redis.config";
 import sessionConfig from "./config/session.config";
 import storageConfig from "./config/storage.config";
+import { validateEnv } from "./config/validation";
 import { PrismaModule } from "./database/prisma/prisma.module";
 import { RedisModule } from "./infrastructure/redis/redis.module";
 import { AuthModule } from "./modules/auth/auth.module";
@@ -26,6 +27,8 @@ import { RealtimeModule } from "./modules/realtime/realtime.module";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: ["../../.env", ".env"],
+      validate: validateEnv,
       load: [appConfig, dbConfig, redisConfig, sessionConfig, storageConfig, pushConfig],
     }),
     PrismaModule,

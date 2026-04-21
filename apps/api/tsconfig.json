@@ -3,6 +3,8 @@
   "compilerOptions": {
     "baseUrl": "./",
     "outDir": "./dist",
+    "rootDir": ".",
+    "types": ["node", "jest", "multer"],
     "paths": {
       "@family-chat/shared/*": ["../../packages/shared/src/*"]
     }

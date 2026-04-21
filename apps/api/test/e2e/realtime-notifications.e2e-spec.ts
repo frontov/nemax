@@ -2,7 +2,7 @@ import { io as ioClient, type Socket } from "socket.io-client";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
-import { PrismaClient } from "@prisma/client";
+import { AppPrismaClient } from "../../src/database/prisma/client";
 import { AppModule } from "../../src/app.module";
 import { WorkerModule } from "../../src/worker.module";
 import { PushService } from "../../src/modules/push/push.service";
@@ -14,11 +14,11 @@ const describeE2E = runE2E ? describe : describe.skip;
 describeE2E("realtime and notifications e2e", () => {
   let app: INestApplication;
   let workerApp: INestApplication | null = null;
-  let prisma: PrismaClient;
+  let prisma: AppPrismaClient;
   const sendNotification = jest.fn().mockResolvedValue(undefined);
 
   beforeAll(async () => {
-    prisma = new PrismaClient();
+    prisma = new AppPrismaClient();
     await prisma.$connect();
     await prisma.auditLog.deleteMany();
     await prisma.pushSubscription.deleteMany();

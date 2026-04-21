@@ -896,6 +896,13 @@ describe("family-chat MVP flows", () => {
   });
 
   it("sends and lists messages", async () => {
+    const encryptedText = JSON.stringify({
+      v: 1,
+      alg: "AES-GCM",
+      iv: "test-iv",
+      data: "Hello from the integration test",
+    });
+
     const owner = await request(app.getHttpServer()).post("/api/families").send({
       familyName: "Chat House",
       displayName: "Writer",
@@ -907,11 +914,11 @@ describe("family-chat MVP flows", () => {
       .post("/api/messages")
       .set("Cookie", owner.headers["set-cookie"])
       .send({
-        text: "Hello from the integration test",
+        text: encryptedText,
       });
 
     expect(sent.status).toBe(201);
-    expect(sent.body.text).toBe("Hello from the integration test");
+    expect(sent.body.text).toBe(encryptedText);
 
     const listed = await request(app.getHttpServer())
       .get("/api/messages")
@@ -921,7 +928,7 @@ describe("family-chat MVP flows", () => {
     expect(listed.body).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          text: "Hello from the integration test",
+          text: encryptedText,
         }),
       ]),
     );

@@ -10,5 +10,6 @@ import { MessagesRepository } from "./messages.repository";
   imports: [NotificationsModule, AuditModule],
   controllers: [MessagesController],
   providers: [MessagesRepository, MessagesService, MessagesEventsService],
+  exports: [MessagesService],
 })
 export class MessagesModule {}

@@ -42,6 +42,7 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-development-public-key}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-development-private-key}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-localhost}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:3000,http://127.0.0.1:8080,http://127.0.0.1:3000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -77,6 +78,7 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-development-public-key}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-development-private-key}
       COOKIE_DOMAIN: ${COOKIE_DOMAIN:-localhost}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://localhost:3000,http://127.0.0.1:8080,http://127.0.0.1:3000}
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,7 +89,7 @@ services:
     restart: unless-stopped
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18.3-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-family_chat}
       POSTGRES_USER: ${POSTGRES_USER:-family_chat}
@@ -105,7 +107,7 @@ services:
     restart: unless-stopped
 
   redis:
-    image: redis:7-alpine
+    image: redis:8.6.2-alpine
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -118,7 +120,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:RELEASE.2025-02-28T09-55-16Z
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -136,7 +138,7 @@ services:
     restart: unless-stopped
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:1.29.8-alpine
     depends_on:
       web:
         condition: service_started

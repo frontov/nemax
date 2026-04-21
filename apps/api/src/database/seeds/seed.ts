@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
-import { PrismaClient } from "@prisma/client";
+import { AppPrismaClient } from "../prisma/client";
 
-const prisma = new PrismaClient();
+const prisma = new AppPrismaClient();
 
 const DEMO_OWNER_ID = "11111111-1111-1111-1111-111111111111";
 const DEMO_FAMILY_ID = "22222222-2222-2222-2222-222222222222";

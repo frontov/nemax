@@ -1,7 +1,7 @@
 {
   "name": "family-chat",
   "private": true,
-  "packageManager": "pnpm@10.11.0",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
@@ -11,7 +11,13 @@
     "seed": "pnpm --filter @family-chat/api seed",
     "test": "turbo run test"
   },
+  "pnpm": {
+    "overrides": {
+      "@hono/node-server": "1.19.13"
+    }
+  },
   "devDependencies": {
-    "turbo": "^2.0.12"
+    "pnpm": "10.33.0",
+    "turbo": "^2.9.6"
   }
 }

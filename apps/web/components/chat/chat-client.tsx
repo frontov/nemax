@@ -15,9 +15,25 @@ type ChatMessage = {
   id: string;
   text: string | null;
   createdAt: string;
+  attachments: Array<{
+    id: string;
+    originalName: string;
+    mimeType: string;
+    sizeBytes: string;
+    width?: number | null;
+    height?: number | null;
+    url: string;
+  }>;
   replyToMessage?: {
     id: string;
     text: string | null;
+    attachments?: Array<{
+      id: string;
+      originalName: string;
+      mimeType: string;
+      sizeBytes: string;
+      url: string;
+    }>;
     sender: {
       id: string;
       displayName: string;
@@ -96,8 +112,13 @@ function isNearBottom(element: HTMLDivElement) {
 
 function buildReplyPreview(message: {
   text: string | null;
+  attachments?: Array<unknown>;
 }) {
   const preview = (message.text ?? "").trim();
+
+  if (!preview && message.attachments?.length) {
+    return "Изображение";
+  }
 
   if (!preview) {
     return "Сообщение без текста";
@@ -116,10 +137,12 @@ async function decryptChatMessage(message: ChatMessage, familyKey: string | null
 
   return {
     ...message,
+    attachments: message.attachments ?? [],
     text: text ?? null,
     replyToMessage: message.replyToMessage
       ? {
           ...message.replyToMessage,
+          attachments: message.replyToMessage.attachments ?? [],
           text: replyText ?? null,
         }
       : null,
@@ -139,8 +162,10 @@ export function ChatClient() {
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [familyKey, setFamilyKey] = useState<string | null>(null);
+  const [imageUploading, setImageUploading] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const familyKeyRef = useRef<string | null>(null);
 
@@ -305,6 +330,61 @@ export function ChatClient() {
     }
   }
 
+  async function uploadImage(file: File) {
+    setError(null);
+
+    const familyKey = familyKeyRef.current;
+
+    if (!familyKey) {
+      setError("Нет семейного ключа шифрования. Откройте чат по ссылке или QR-коду из админки.");
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setError("Можно отправлять только картинки.");
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setError("Картинка слишком большая. Максимум 8 МБ.");
+      return;
+    }
+
+    const previousText = text;
+    const caption = text.trim() || "Изображение";
+    setText("");
+    setImageUploading(true);
+
+    try {
+      const encryptedText = await encryptMessageText(caption, familyKey);
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("text", encryptedText);
+
+      const response = await fetch(`${apiClient.baseUrl}/attachments/images`, {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+
+      const message = (await response.json()) as ChatMessage;
+      appendMessage(message);
+    } catch (reason) {
+      setText(previousText);
+      setError(reason instanceof Error ? reason.message : "Не удалось отправить картинку");
+    } finally {
+      setImageUploading(false);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await submitMessage();
@@ -330,6 +410,16 @@ export function ChatClient() {
       return `${current}${spacer}${emoji}`.trimStart();
     });
     textareaRef.current?.focus();
+  }
+
+  function handlePickImage(fileList: FileList | null) {
+    const file = fileList?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    void uploadImage(file);
   }
 
   return (
@@ -390,6 +480,19 @@ export function ChatClient() {
                                 <div className="chatReplyText">
                                   {buildReplyPreview(message.replyToMessage)}
                                 </div>
+                              </div>
+                            ) : null}
+                            {message.attachments.length > 0 ? (
+                              <div className="chatAttachments">
+                                {message.attachments.map((attachment) => (
+                                  <img
+                                    key={attachment.id}
+                                    src={attachment.url}
+                                    alt={attachment.originalName}
+                                    className="chatImage"
+                                    loading="lazy"
+                                  />
+                                ))}
                               </div>
                             ) : null}
                             <span>{message.text ?? ""}</span>
@@ -462,6 +565,22 @@ export function ChatClient() {
             >
               🙂
             </button>
+            <button
+              type="button"
+              className="chatAttachButton"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={imageUploading}
+              aria-label="Отправить картинку"
+            >
+              📷
+            </button>
+            <input
+              ref={fileInputRef}
+              className="visuallyHidden"
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              onChange={(event) => handlePickImage(event.target.files)}
+            />
             <textarea
               ref={textareaRef}
               value={text}
@@ -470,8 +589,8 @@ export function ChatClient() {
               rows={2}
               placeholder="Напишите сообщение или нажмите на пузырёк, чтобы ответить…"
             />
-            <button type="submit" className="chatSendButton" disabled={!text.trim()}>
-              Отправить
+            <button type="submit" className="chatSendButton" disabled={!text.trim() || imageUploading}>
+              {imageUploading ? "Грузим…" : "Отправить"}
             </button>
           </form>
         </div>

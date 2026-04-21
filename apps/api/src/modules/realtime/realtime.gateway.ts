@@ -9,13 +9,14 @@ import {
   WebSocketServer,
 } from "@nestjs/websockets";
 import type { Server, Socket } from "socket.io";
+import { corsOrigin } from "../../common/utils/cors-origin";
 import { AuthService } from "../auth/auth.service";
 import { RealtimeService } from "./realtime.service";
 
 @WebSocketGateway({
   path: "/ws",
   cors: {
-    origin: true,
+    origin: corsOrigin,
     credentials: true,
   },
 })
