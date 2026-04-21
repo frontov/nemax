@@ -21,6 +21,14 @@ export class MembersService {
   async removeMember(sessionContext: SessionContext, memberId: string) {
     const actorMember = this.authService.assertFamilyAccess(sessionContext);
 
+    if (actorMember.role !== "owner") {
+      throw new BadRequestException("Only family owner can remove members");
+    }
+
+    if (memberId === actorMember.id) {
+      throw new BadRequestException("Owner cannot remove themselves");
+    }
+
     const result = await this.membersRepository.removeMember(actorMember.familyId, memberId);
 
     if (!result) {

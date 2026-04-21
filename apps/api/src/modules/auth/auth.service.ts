@@ -67,6 +67,14 @@ export class AuthService {
             name: sessionContext.family.name,
           }
         : null,
+      memberships: sessionContext.memberships.map((membership) => ({
+        id: membership.id,
+        role: membership.role,
+        family: {
+          id: membership.family.id,
+          name: membership.family.name,
+        },
+      })),
       member: sessionContext.member
         ? {
             id: sessionContext.member.id,

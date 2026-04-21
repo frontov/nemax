@@ -3,7 +3,9 @@ import { BadRequestException } from "@nestjs/common";
 import { randomBytes, createHash } from "crypto";
 import { SESSION_TTL_DAYS } from "../../common/constants/auth.constants";
 import { AuditService } from "../audit/audit.service";
+import type { SessionContext } from "../auth/auth.service";
 import { CreateFamilyDto } from "./dto/create-family.dto";
+import { SetActiveFamilyDto } from "./dto/set-active-family.dto";
 import { FamiliesRepository } from "./families.repository";
 
 @Injectable()
@@ -46,6 +48,33 @@ export class FamiliesService {
     return {
       ...result,
       sessionToken,
+    };
+  }
+
+  async setActiveFamily(sessionContext: SessionContext, input: SetActiveFamilyDto) {
+    const membership = await this.familiesRepository.setActiveFamily({
+      userId: sessionContext.user.id,
+      deviceId: sessionContext.device.id,
+      familyId: input.familyId,
+    });
+
+    if (!membership) {
+      throw new BadRequestException("Family is not available for this user");
+    }
+
+    await this.auditService.log({
+      familyId: membership.familyId,
+      userId: sessionContext.user.id,
+      actorUserId: sessionContext.user.id,
+      eventType: "family.active.changed",
+      payloadJson: {
+        familyId: membership.familyId,
+      },
+    });
+
+    return {
+      family: membership.family,
+      member: membership,
     };
   }
 }

@@ -16,6 +16,14 @@ type MePayload = {
     id: string;
     name: string;
   } | null;
+  memberships: Array<{
+    id: string;
+    role: string;
+    family: {
+      id: string;
+      name: string;
+    };
+  }>;
 };
 
 export function HomeGate() {
@@ -24,6 +32,7 @@ export function HomeGate() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState<MePayload | null>(null);
+  const [switchingFamily, setSwitchingFamily] = useState(false);
 
   useEffect(() => {
     void apiClient
@@ -46,6 +55,27 @@ export function HomeGate() {
     router.push(`/join/${encodeURIComponent(normalizedCode)}`);
   }
 
+  async function handleFamilyChange(familyId: string) {
+    if (!familyId || familyId === me?.family?.id) {
+      return;
+    }
+
+    setError(null);
+    setSwitchingFamily(true);
+
+    try {
+      await apiClient.request({
+        path: "/families/active",
+        method: "POST",
+        body: JSON.stringify({ familyId }),
+      });
+      window.location.reload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось переключить чат");
+      setSwitchingFamily(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="shell">
@@ -65,6 +95,24 @@ export function HomeGate() {
       <main className="shell">
         <div className="frame">
           <div className="page pageTight chatPageFrame">
+            {me.memberships.length > 1 ? (
+              <div className="chatFamilyPicker">
+                <label htmlFor="familyPicker">Чат</label>
+                <select
+                  id="familyPicker"
+                  value={me.family?.id ?? ""}
+                  onChange={(event) => void handleFamilyChange(event.target.value)}
+                  disabled={switchingFamily}
+                >
+                  {me.memberships.map((membership) => (
+                    <option key={membership.id} value={membership.family.id}>
+                      {membership.family.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
+            {error ? <div className="statusMessage error">{error}</div> : null}
             <ChatClient />
           </div>
         </div>

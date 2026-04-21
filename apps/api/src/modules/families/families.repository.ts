@@ -61,4 +61,38 @@ export class FamiliesRepository {
       return { user, family, member, device, session };
     });
   }
+
+  async setActiveFamily(input: {
+    userId: string;
+    deviceId: string;
+    familyId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const membership = await tx.familyMember.findFirst({
+        where: {
+          userId: input.userId,
+          familyId: input.familyId,
+          removedAt: null,
+        },
+        include: {
+          family: true,
+        },
+      });
+
+      if (!membership) {
+        return null;
+      }
+
+      await tx.device.update({
+        where: {
+          id: input.deviceId,
+        },
+        data: {
+          familyId: input.familyId,
+        },
+      });
+
+      return membership;
+    });
+  }
 }

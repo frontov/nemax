@@ -124,6 +124,26 @@ a {
   line-height: 1.5;
 }
 
+.memberCard {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.secondaryButton {
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.dangerButton {
+  border-color: rgba(180, 69, 47, 0.18);
+  color: #8e3c2f;
+}
+
 .nav {
   display: flex;
   flex-wrap: wrap;
@@ -287,6 +307,23 @@ button:hover {
 
 .chatLayout {
   display: block;
+  min-height: 0;
+}
+
+.chatFamilyPicker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.chatFamilyPicker label {
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .chatShell {
@@ -897,14 +934,44 @@ button:hover {
     margin-top: 8px;
   }
 
+  .shell:has(.chatPageFrame) {
+    height: 100dvh;
+    min-height: 100dvh;
+    overflow: hidden;
+    padding: 8px;
+  }
+
+  .chatPageFrame {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 16px);
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .chatPageFrame .chatLayout,
+  .chatPageFrame .chatShell {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   .inviteEntry {
     grid-template-columns: 1fr;
   }
 
   .chatShell {
-    height: min(84vh, 920px);
+    height: 100%;
     padding: 8px;
     border-radius: 22px;
+  }
+
+  .memberCard {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .memberCard button {
+    width: 100%;
   }
 
   .chatThread {

@@ -8,6 +8,14 @@ export type MeResponseDto = {
     id: string;
     name: string;
   } | null;
+  memberships: Array<{
+    id: string;
+    role: string;
+    family: {
+      id: string;
+      name: string;
+    };
+  }>;
   member: {
     id: string;
     role: string;
