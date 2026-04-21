@@ -6,7 +6,7 @@
     "build": "nest build",
     "dev": "nest start --watch",
     "lint": "tsc --noEmit -p tsconfig.json",
-    "prisma:generate": "prisma generate",
+    "prisma:generate": "prisma generate && node scripts/patch-prisma-cjs.js",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/database/seeds/seed.ts",
