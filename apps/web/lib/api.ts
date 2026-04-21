@@ -3,7 +3,7 @@ export type ApiClientOptions = RequestInit & {
 };
 
 export const apiClient = {
-  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8080/api",
+  baseUrl: process.env.NEXT_PUBLIC_API_URL ?? "/api",
   async request<T>({ path, ...init }: ApiClientOptions): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       credentials: "include",
