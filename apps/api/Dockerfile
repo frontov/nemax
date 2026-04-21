@@ -16,7 +16,8 @@ COPY packages ./packages
 COPY apps/api ./apps/api
 
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @family-chat/api prisma:generate
+RUN DATABASE_URL="postgresql://family_chat:family_chat@postgres:5432/family_chat?schema=public" \
+  pnpm --filter @family-chat/api prisma:generate
 RUN pnpm --filter @family-chat/api build
 
 EXPOSE 3001
