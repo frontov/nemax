@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { apiClient } from "@/lib/api";
+import { getOrCreateFamilyKey } from "@/lib/e2e-crypto";
 
 export function CreateFamilyForm() {
   const [error, setError] = useState<string | null>(null);
@@ -10,11 +11,12 @@ export function CreateFamilyForm() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     setError(null);
     setSuccess(null);
 
     try {
-      const formData = new FormData(event.currentTarget);
+      const formData = new FormData(form);
       const response = await apiClient.request<{ family: { name: string } }>({
         path: "/families",
         method: "POST",
@@ -26,8 +28,9 @@ export function CreateFamilyForm() {
         }),
       });
 
+      await getOrCreateFamilyKey();
       setSuccess(`Готово! Пространство «${response.family.name}» создано.`);
-      event.currentTarget.reset();
+      form.reset();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось создать семейное пространство");
     }

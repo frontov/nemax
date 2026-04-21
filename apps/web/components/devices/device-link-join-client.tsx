@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
 import { storeFamilyKeyFromLocationHash } from "@/lib/e2e-crypto";
 
-export function DirectJoinClient({ token }: { token: string }) {
+export function DeviceLinkJoinClient({ token }: { token: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
 
@@ -14,7 +14,7 @@ export function DirectJoinClient({ token }: { token: string }) {
 
     void apiClient
       .request({
-        path: `/invites/direct/${token}/join`,
+        path: `/devices/link/${token}/join`,
         method: "POST",
       })
       .then(() => {
@@ -31,7 +31,7 @@ export function DirectJoinClient({ token }: { token: string }) {
           return;
         }
 
-        setError(reason instanceof Error ? reason.message : "Не удалось присоединиться по ссылке");
+        setError(reason instanceof Error ? reason.message : "Не удалось добавить устройство");
       });
 
     return () => {
@@ -42,11 +42,11 @@ export function DirectJoinClient({ token }: { token: string }) {
   return (
     <section className="metaGrid">
       <div className="meta" style={{ gridColumn: "1 / -1" }}>
-        <div className="metaLabel">Мгновенный вход</div>
+        <div className="metaLabel">Подключение устройства</div>
         {error ? (
           <div className="statusMessage error">{error}</div>
         ) : (
-          <div className="statusMessage">Соединяем вас с семейным чатом…</div>
+          <div className="statusMessage">Добавляем это устройство к вашему аккаунту…</div>
         )}
       </div>
     </section>

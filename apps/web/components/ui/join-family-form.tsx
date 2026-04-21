@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiClient } from "@/lib/api";
+import { storeFamilyKeyFromLocationHash } from "@/lib/e2e-crypto";
 
 type InviteValidation = {
   valid: boolean;
@@ -48,6 +49,7 @@ export function JoinFamilyForm({ code }: { code: string }) {
         }),
       });
 
+      storeFamilyKeyFromLocationHash();
       setSuccess("Готово. Открываем семейный чат…");
       window.setTimeout(() => {
         router.push("/");

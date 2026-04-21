@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { apiClient } from "@/lib/api";
+import { appendFamilyKeyToUrl, getOrCreateFamilyKey } from "@/lib/e2e-crypto";
 
 type InviteResponse = {
   code: string;
@@ -15,22 +16,25 @@ export function InviteForm() {
   const [invite, setInvite] = useState<InviteResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [familyKey, setFamilyKey] = useState<string | null>(null);
 
   const inviteLink = useMemo(() => {
     if (!invite || typeof window === "undefined") {
       return null;
     }
 
-    return `${window.location.origin}/join/${invite.code}`;
-  }, [invite]);
+    const url = `${window.location.origin}/join/${invite.code}`;
+    return familyKey ? appendFamilyKeyToUrl(url, familyKey) : url;
+  }, [familyKey, invite]);
 
   const directJoinLink = useMemo(() => {
     if (!invite?.directJoinToken || typeof window === "undefined") {
       return null;
     }
 
-    return `${window.location.origin}/join/direct/${invite.directJoinToken}`;
-  }, [invite]);
+    const url = `${window.location.origin}/join/direct/${invite.directJoinToken}`;
+    return familyKey ? appendFamilyKeyToUrl(url, familyKey) : url;
+  }, [familyKey, invite]);
 
   useEffect(() => {
     if (!directJoinLink) {
@@ -73,18 +77,20 @@ export function InviteForm() {
 
     try {
       const formData = new FormData(event.currentTarget);
+      const key = await getOrCreateFamilyKey();
       const response = await apiClient.request<InviteResponse>({
         path: "/invites",
         method: "POST",
         body: JSON.stringify({
-              role: formData.get("role"),
-              maxUses: Number(formData.get("maxUses") || 1),
-              expiresInDays: Number(formData.get("expiresInDays") || 7),
-              directJoinDisplayName: formData.get("directJoinDisplayName"),
-              directJoinDeviceName: formData.get("directJoinDeviceName"),
-            }),
-          });
+          role: formData.get("role"),
+          maxUses: Number(formData.get("maxUses") || 1),
+          expiresInDays: Number(formData.get("expiresInDays") || 7),
+          directJoinDisplayName: formData.get("directJoinDisplayName"),
+          directJoinDeviceName: formData.get("directJoinDeviceName"),
+        }),
+      });
 
+      setFamilyKey(key);
       setInvite(response);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Не удалось создать приглашение");

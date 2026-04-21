@@ -2,7 +2,7 @@ import { IsOptional, IsString, MaxLength } from "class-validator";
 
 export class CreateMessageDto {
   @IsString()
-  @MaxLength(5000)
+  @MaxLength(12000)
   text!: string;
 
   @IsOptional()

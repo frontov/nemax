@@ -7,6 +7,19 @@ import { CreateMessageDto } from "./dto/create-message.dto";
 import { MessagesEventsService } from "./messages.events.service";
 import { MessagesRepository } from "./messages.repository";
 
+function isEncryptedText(value: string | null | undefined) {
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as { v?: number; alg?: string };
+    return parsed.v === 1 && parsed.alg === "AES-GCM";
+  } catch {
+    return false;
+  }
+}
+
 @Injectable()
 export class MessagesService {
   constructor(
@@ -27,6 +40,10 @@ export class MessagesService {
 
     if (!input.text.trim()) {
       throw new BadRequestException("Message text is required");
+    }
+
+    if (!isEncryptedText(input.text)) {
+      throw new BadRequestException("Message must be end-to-end encrypted");
     }
 
     let replyToMessage = null;
@@ -77,7 +94,7 @@ export class MessagesService {
       senderUserId: sessionContext.user.id,
       senderDisplayName: sessionContext.user.displayName,
       messageId: message.id,
-      text: message.text ?? "",
+      text: isEncryptedText(message.text) ? "Новое зашифрованное сообщение" : (message.text ?? ""),
     });
 
     await this.auditService.log({

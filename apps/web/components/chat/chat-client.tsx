@@ -3,6 +3,12 @@
 import type { FormEvent, KeyboardEvent } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "@/lib/api";
+import {
+  decryptMessageText,
+  encryptMessageText,
+  getStoredFamilyKey,
+  storeFamilyKeyFromLocationHash,
+} from "@/lib/e2e-crypto";
 import { websocketClient } from "@/lib/websocket";
 
 type ChatMessage = {
@@ -100,6 +106,30 @@ function buildReplyPreview(message: {
   return preview.length > 90 ? `${preview.slice(0, 90)}…` : preview;
 }
 
+async function decryptChatMessage(message: ChatMessage, familyKey: string | null): Promise<ChatMessage> {
+  const text = await decryptMessageText(message.text, familyKey).catch(() => "🔒 Не удалось расшифровать сообщение");
+  const replyText = message.replyToMessage
+    ? await decryptMessageText(message.replyToMessage.text, familyKey).catch(
+        () => "🔒 Не удалось расшифровать сообщение",
+      )
+    : null;
+
+  return {
+    ...message,
+    text: text ?? null,
+    replyToMessage: message.replyToMessage
+      ? {
+          ...message.replyToMessage,
+          text: replyText ?? null,
+        }
+      : null,
+  };
+}
+
+async function decryptChatMessages(messages: ChatMessage[], familyKey: string | null) {
+  return Promise.all(messages.map((message) => decryptChatMessage(message, familyKey)));
+}
+
 export function ChatClient() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
@@ -108,9 +138,11 @@ export function ChatClient() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [familyKey, setFamilyKey] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
+  const familyKeyRef = useRef<string | null>(null);
 
   const groupedMessages = useMemo(
     () =>
@@ -171,10 +203,16 @@ export function ChatClient() {
       shouldAutoScrollRef.current = isNearBottom(scrollRef.current);
     }
 
-    setMessages((current) => mergeMessage(current, message));
+    void decryptChatMessage(message, familyKeyRef.current).then((decryptedMessage) => {
+      setMessages((current) => mergeMessage(current, decryptedMessage));
+    });
   }
 
   useEffect(() => {
+    const hashKey = storeFamilyKeyFromLocationHash();
+    familyKeyRef.current = hashKey ?? getStoredFamilyKey();
+    setFamilyKey(familyKeyRef.current);
+
     void apiClient
       .request<MePayload>({ path: "/auth/me" })
       .then((payload) => setCurrentUserId(payload.user.id))
@@ -182,6 +220,7 @@ export function ChatClient() {
 
     void apiClient
       .request<ChatMessage[]>({ path: "/messages" })
+      .then((payload) => decryptChatMessages(payload, familyKeyRef.current))
       .then(setMessages)
       .catch((reason) =>
         setError(reason instanceof Error ? reason.message : "Не удалось загрузить сообщения"),
@@ -230,16 +269,24 @@ export function ChatClient() {
 
     const previousText = text;
     const previousReply = replyToMessage;
+    const familyKey = familyKeyRef.current;
+
+    if (!familyKey) {
+      setError("Нет семейного ключа шифрования. Откройте чат по ссылке или QR-коду из админки.");
+      return;
+    }
+
     setText("");
     setReplyToMessage(null);
     setEmojiOpen(false);
 
     try {
+      const encryptedText = await encryptMessageText(trimmedText, familyKey);
       const message = await apiClient.request<ChatMessage>({
         path: "/messages",
         method: "POST",
         body: JSON.stringify({
-          text: trimmedText,
+          text: encryptedText,
           replyToMessageId: previousReply?.id,
         }),
       });
@@ -288,8 +335,15 @@ export function ChatClient() {
   return (
     <section className="chatLayout">
       <div className="chatShell">
-        {loading ? <div className="statusMessage">Загружаем семейные сообщения…</div> : null}
-        {error ? <div className="statusMessage error">{error}</div> : null}
+        <div className="chatNotices">
+          {loading ? <div className="statusMessage">Загружаем семейные сообщения…</div> : null}
+          {error ? <div className="statusMessage error">{error}</div> : null}
+          {!familyKey ? (
+            <div className="statusMessage">
+              Сообщения защищены E2E. Чтобы писать и читать новые сообщения, откройте чат по семейной ссылке или QR.
+            </div>
+          ) : null}
+        </div>
         <div
           ref={scrollRef}
           className="chatScroll"
