@@ -50,7 +50,7 @@ export function JoinFamilyForm({ code }: { code: string }) {
       });
 
       storeFamilyKeyFromLocationHash();
-      setSuccess("Готово. Открываем семейный чат…");
+      setSuccess("Готово. Открываем Не Мах…");
       window.setTimeout(() => {
         router.push("/");
         router.refresh();

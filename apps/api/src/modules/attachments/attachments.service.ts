@@ -8,6 +8,7 @@ import { MessagesService } from "../messages/messages.service";
 import { AttachmentsRepository } from "./attachments.repository";
 
 const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
+const MAX_ALBUM_IMAGES = 10;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 function detectImageMimeType(buffer: Buffer) {
@@ -93,44 +94,68 @@ export class AttachmentsService {
     file: Express.Multer.File | undefined,
     encryptedText: string | undefined,
   ) {
+    return this.uploadImageAlbumMessage(sessionContext, file ? [file] : [], encryptedText);
+  }
+
+  async uploadImageAlbumMessage(
+    sessionContext: SessionContext,
+    files: Express.Multer.File[] | undefined,
+    encryptedText: string | undefined,
+    replyToMessageId?: string,
+  ) {
     this.authService.assertFamilyAccess(sessionContext);
 
-    if (!file) {
+    if (!files?.length) {
       throw new BadRequestException("Image file is required");
+    }
+
+    if (files.length > MAX_ALBUM_IMAGES) {
+      throw new BadRequestException(`Album can contain up to ${MAX_ALBUM_IMAGES} images`);
     }
 
     if (!encryptedText) {
       throw new BadRequestException("Encrypted image caption is required");
     }
 
-    if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
-      throw new BadRequestException("Only JPEG, PNG, WebP and GIF images are supported");
-    }
+    for (const file of files) {
+      if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+        throw new BadRequestException("Only JPEG, PNG, WebP and GIF images are supported");
+      }
 
-    const detectedMimeType = detectImageMimeType(file.buffer);
+      const detectedMimeType = detectImageMimeType(file.buffer);
 
-    if (detectedMimeType !== file.mimetype) {
-      throw new BadRequestException("Image content does not match its declared type");
-    }
+      if (detectedMimeType !== file.mimetype) {
+        throw new BadRequestException("Image content does not match its declared type");
+      }
 
-    if (file.size > MAX_IMAGE_SIZE_BYTES) {
-      throw new BadRequestException("Image is too large");
+      if (file.size > MAX_IMAGE_SIZE_BYTES) {
+        throw new BadRequestException("Image is too large");
+      }
     }
 
     await this.ensureBucket();
 
-    const storageKey = this.createStorageKey(sessionContext, file.originalname);
-    await this.client.putObject(this.bucket, storageKey, file.buffer, file.size, {
-      "Content-Type": file.mimetype,
-      "X-Original-Name": encodeURIComponent(file.originalname),
-    });
+    const attachments = await Promise.all(
+      files.map(async (file) => {
+        const storageKey = this.createStorageKey(sessionContext, file.originalname);
+        await this.client.putObject(this.bucket, storageKey, file.buffer, file.size, {
+          "Content-Type": file.mimetype,
+          "X-Original-Name": encodeURIComponent(file.originalname),
+        });
 
-    return this.messagesService.sendImageMessage(sessionContext, {
+        return {
+          storageKey,
+          originalName: file.originalname,
+          mimeType: file.mimetype,
+          sizeBytes: BigInt(file.size),
+        };
+      }),
+    );
+
+    return this.messagesService.sendImageAlbumMessage(sessionContext, {
       text: encryptedText,
-      storageKey,
-      originalName: file.originalname,
-      mimeType: file.mimetype,
-      sizeBytes: BigInt(file.size),
+      replyToMessageId,
+      attachments,
     });
   }
 

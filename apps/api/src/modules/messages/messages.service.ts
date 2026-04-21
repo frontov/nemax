@@ -147,22 +147,61 @@ export class MessagesService {
       sizeBytes: bigint;
     },
   ) {
+    return this.sendImageAlbumMessage(sessionContext, {
+      text: input.text,
+      attachments: [
+        {
+          storageKey: input.storageKey,
+          originalName: input.originalName,
+          mimeType: input.mimeType,
+          sizeBytes: input.sizeBytes,
+        },
+      ],
+    });
+  }
+
+  async sendImageAlbumMessage(
+    sessionContext: SessionContext,
+    input: {
+      text: string;
+      replyToMessageId?: string;
+      attachments: Array<{
+        storageKey: string;
+        originalName: string;
+        mimeType: string;
+        sizeBytes: bigint;
+      }>;
+    },
+  ) {
     const member = this.authService.assertFamilyAccess(sessionContext);
 
     if (!isEncryptedText(input.text)) {
       throw new BadRequestException("Message must be end-to-end encrypted");
     }
 
+    if (input.attachments.length === 0) {
+      throw new BadRequestException("Image file is required");
+    }
+
+    let replyToMessage = null;
+
+    if (input.replyToMessageId) {
+      replyToMessage = await this.messagesRepository.findActiveMessageForFamily(
+        input.replyToMessageId,
+        member.familyId,
+      );
+
+      if (!replyToMessage) {
+        throw new BadRequestException("Reply target message was not found");
+      }
+    }
+
     const message = await this.messagesRepository.createMessage({
       familyId: member.familyId,
       senderUserId: sessionContext.user.id,
       text: input.text,
-      attachment: {
-        storageKey: input.storageKey,
-        originalName: input.originalName,
-        mimeType: input.mimeType,
-        sizeBytes: input.sizeBytes,
-      },
+      replyToMessageId: replyToMessage?.id,
+      attachments: input.attachments,
     });
 
     const serializedMessage = serializeMessage(message);
@@ -178,7 +217,16 @@ export class MessagesService {
         id: serializedMessage.sender.id,
         displayName: serializedMessage.sender.displayName,
       },
-      replyToMessage: null,
+      replyToMessage: serializedMessage.replyToMessage
+        ? {
+            id: serializedMessage.replyToMessage.id,
+            text: serializedMessage.replyToMessage.text,
+            sender: {
+              id: serializedMessage.replyToMessage.sender.id,
+              displayName: serializedMessage.replyToMessage.sender.displayName,
+            },
+          }
+        : null,
     });
 
     await this.notificationsService.enqueueMessageNotification({
@@ -196,6 +244,7 @@ export class MessagesService {
       eventType: "message.image.created",
       payloadJson: {
         messageId: message.id,
+        attachmentCount: input.attachments.length,
       },
     });
 

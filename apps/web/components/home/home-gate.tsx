@@ -81,7 +81,7 @@ export function HomeGate() {
       <main className="shell">
         <div className="frame">
           <section className="hero heroCompact">
-            <span className="eyebrow">семейный чат</span>
+            <span className="eyebrow">Не Мах</span>
             <h1>Подготавливаем пространство…</h1>
             <p>Проверяем, есть ли у вас активная семейная сессия.</p>
           </section>
@@ -125,7 +125,7 @@ export function HomeGate() {
       <div className="frame">
         <section className="hero heroCompact">
           <span className="eyebrow">вход по приглашению</span>
-          <h1>Введите код и войдите в семейный чат.</h1>
+          <h1>Введите код и войдите в Не Мах.</h1>
           <p>Только код приглашения. Без лишних кнопок и сложных шагов.</p>
 
           <form onSubmit={handleSubmit} className="inviteEntry">

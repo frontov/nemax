@@ -1,9 +1,16 @@
 {
-  "name": "family-chat",
-  "short_name": "Family Chat",
+  "name": "Не Мах",
+  "short_name": "Не Мах",
   "display": "standalone",
   "start_url": "/",
-  "background_color": "#f5f1e8",
-  "theme_color": "#e36d4c",
-  "icons": []
+  "background_color": "#f4f8fc",
+  "theme_color": "#5b95db",
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

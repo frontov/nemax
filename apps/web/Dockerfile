@@ -14,7 +14,8 @@ COPY apps/web ./apps/web
 RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @family-chat/web build
 RUN mkdir -p apps/web/.next/standalone/apps/web/.next/static \
-  && cp -R apps/web/.next/static/. apps/web/.next/standalone/apps/web/.next/static/
+  && cp -R apps/web/.next/static/. apps/web/.next/standalone/apps/web/.next/static/ \
+  && cp -R apps/web/public apps/web/.next/standalone/apps/web/public
 
 EXPOSE 3000
 

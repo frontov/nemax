@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LogoutButton } from "@/components/admin/logout-button";
 
 const adminCards = [
   {
@@ -63,6 +64,8 @@ export default function AdminPage() {
               </Link>
             ))}
           </section>
+
+          <LogoutButton />
         </section>
       </div>
     </main>

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Не Мах">
+  <defs>
+    <linearGradient id="bg" x1="12" y1="8" x2="52" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DB6F2"/>
+      <stop offset="1" stop-color="#3D78C6"/>
+    </linearGradient>
+    <linearGradient id="tail" x1="38" y1="38" x2="55" y2="53" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#DCEBFF"/>
+      <stop offset="1" stop-color="#BFD8F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="#F4F8FC"/>
+  <path d="M12 24c0-9.4 7.6-17 17-17h6c9.4 0 17 7.6 17 17v6c0 9.4-7.6 17-17 17H24.5L13 55l3.3-11.7A16.9 16.9 0 0 1 12 32v-8Z" fill="url(#bg)"/>
+  <path d="M39 43h7.7c4.1 0 7.3 3.3 7.3 7.3v.3c0 3.5-2.8 6.4-6.4 6.4H35l4-14Z" fill="url(#tail)" opacity=".95"/>
+  <text x="32" y="37" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="20" font-weight="700" fill="#FFFFFF">НМ</text>
+</svg>

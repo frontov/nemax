@@ -15,15 +15,7 @@ type ChatMessage = {
   id: string;
   text: string | null;
   createdAt: string;
-  attachments: Array<{
-    id: string;
-    originalName: string;
-    mimeType: string;
-    sizeBytes: string;
-    width?: number | null;
-    height?: number | null;
-    url: string;
-  }>;
+  attachments: ChatAttachment[];
   replyToMessage?: {
     id: string;
     text: string | null;
@@ -43,6 +35,16 @@ type ChatMessage = {
     id: string;
     displayName: string;
   };
+};
+
+type ChatAttachment = {
+  id: string;
+  originalName: string;
+  mimeType: string;
+  sizeBytes: string;
+  width?: number | null;
+  height?: number | null;
+  url: string;
 };
 
 type MePayload = {
@@ -163,6 +165,10 @@ export function ChatClient() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [familyKey, setFamilyKey] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [lightbox, setLightbox] = useState<{
+    attachments: ChatAttachment[];
+    index: number;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -284,6 +290,29 @@ export function ChatClient() {
     });
   }, [groupedMessages, loading]);
 
+  useEffect(() => {
+    if (!lightbox) {
+      return;
+    }
+
+    function handleLightboxKey(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        setLightbox(null);
+      }
+
+      if (event.key === "ArrowLeft") {
+        showPreviousPhoto();
+      }
+
+      if (event.key === "ArrowRight") {
+        showNextPhoto();
+      }
+    }
+
+    window.addEventListener("keydown", handleLightboxKey);
+    return () => window.removeEventListener("keydown", handleLightboxKey);
+  }, [lightbox]);
+
   async function submitMessage() {
     setError(null);
     const trimmedText = text.trim();
@@ -330,7 +359,7 @@ export function ChatClient() {
     }
   }
 
-  async function uploadImage(file: File) {
+  async function uploadImages(files: File[]) {
     setError(null);
 
     const familyKey = familyKeyRef.current;
@@ -340,28 +369,43 @@ export function ChatClient() {
       return;
     }
 
-    if (!file.type.startsWith("image/")) {
+    if (files.length === 0) {
+      return;
+    }
+
+    if (files.length > 10) {
+      setError("В один альбом можно добавить до 10 фото.");
+      return;
+    }
+
+    if (files.some((file) => !file.type.startsWith("image/"))) {
       setError("Можно отправлять только картинки.");
       return;
     }
 
-    if (file.size > 8 * 1024 * 1024) {
-      setError("Картинка слишком большая. Максимум 8 МБ.");
+    if (files.some((file) => file.size > 8 * 1024 * 1024)) {
+      setError("Одна из картинок слишком большая. Максимум 8 МБ на фото.");
       return;
     }
 
     const previousText = text;
-    const caption = text.trim() || "Изображение";
+    const previousReply = replyToMessage;
+    const caption = text.trim();
     setText("");
+    setReplyToMessage(null);
+    setEmojiOpen(false);
     setImageUploading(true);
 
     try {
       const encryptedText = await encryptMessageText(caption, familyKey);
       const formData = new FormData();
-      formData.append("image", file);
+      files.forEach((file) => formData.append("images", file));
       formData.append("text", encryptedText);
+      if (previousReply?.id) {
+        formData.append("replyToMessageId", previousReply.id);
+      }
 
-      const response = await fetch(`${apiClient.baseUrl}/attachments/images`, {
+      const response = await fetch(`${apiClient.baseUrl}/attachments/images/album`, {
         method: "POST",
         credentials: "include",
         body: formData,
@@ -375,6 +419,7 @@ export function ChatClient() {
       appendMessage(message);
     } catch (reason) {
       setText(previousText);
+      setReplyToMessage(previousReply);
       setError(reason instanceof Error ? reason.message : "Не удалось отправить картинку");
     } finally {
       setImageUploading(false);
@@ -413,13 +458,46 @@ export function ChatClient() {
   }
 
   function handlePickImage(fileList: FileList | null) {
-    const file = fileList?.[0];
+    const files = Array.from(fileList ?? []);
 
-    if (!file) {
+    if (files.length === 0) {
       return;
     }
 
-    void uploadImage(file);
+    void uploadImages(files);
+  }
+
+  function openLightbox(attachments: ChatAttachment[], index: number) {
+    setLightbox({
+      attachments,
+      index,
+    });
+  }
+
+  function showPreviousPhoto() {
+    setLightbox((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        index: (current.index - 1 + current.attachments.length) % current.attachments.length,
+      };
+    });
+  }
+
+  function showNextPhoto() {
+    setLightbox((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        index: (current.index + 1) % current.attachments.length,
+      };
+    });
   }
 
   return (
@@ -483,15 +561,27 @@ export function ChatClient() {
                               </div>
                             ) : null}
                             {message.attachments.length > 0 ? (
-                              <div className="chatAttachments">
-                                {message.attachments.map((attachment) => (
-                                  <img
+                              <div
+                                className={`chatAttachments album-${Math.min(message.attachments.length, 4)}`}
+                                data-count={message.attachments.length}
+                              >
+                                {message.attachments.map((attachment, attachmentIndex) => (
+                                  <button
                                     key={attachment.id}
-                                    src={attachment.url}
-                                    alt={attachment.originalName}
-                                    className="chatImage"
-                                    loading="lazy"
-                                  />
+                                    type="button"
+                                    className="chatImageButton"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      openLightbox(message.attachments, attachmentIndex);
+                                    }}
+                                  >
+                                    <img
+                                      src={attachment.url}
+                                      alt={attachment.originalName}
+                                      className="chatImage"
+                                      loading="lazy"
+                                    />
+                                  </button>
                                 ))}
                               </div>
                             ) : null}
@@ -579,6 +669,7 @@ export function ChatClient() {
               className="visuallyHidden"
               type="file"
               accept="image/jpeg,image/png,image/webp,image/gif"
+              multiple
               onChange={(event) => handlePickImage(event.target.files)}
             />
             <textarea
@@ -595,6 +686,46 @@ export function ChatClient() {
           </form>
         </div>
       </div>
+      {lightbox ? (
+        <div className="chatLightbox" role="dialog" aria-modal="true" aria-label="Просмотр фото">
+          <button type="button" className="chatLightboxBackdrop" onClick={() => setLightbox(null)} />
+          <div className="chatLightboxFrame">
+            <div className="chatLightboxTopbar">
+              <span>
+                {lightbox.index + 1} из {lightbox.attachments.length}
+              </span>
+              <button type="button" className="chatLightboxClose" onClick={() => setLightbox(null)}>
+                Закрыть
+              </button>
+            </div>
+            {lightbox.attachments.length > 1 ? (
+              <button
+                type="button"
+                className="chatLightboxNav isPrev"
+                onClick={showPreviousPhoto}
+                aria-label="Предыдущее фото"
+              >
+                ‹
+              </button>
+            ) : null}
+            <img
+              src={lightbox.attachments[lightbox.index]?.url}
+              alt={lightbox.attachments[lightbox.index]?.originalName ?? "Фото"}
+              className="chatLightboxImage"
+            />
+            {lightbox.attachments.length > 1 ? (
+              <button
+                type="button"
+                className="chatLightboxNav isNext"
+                onClick={showNextPhoto}
+                aria-label="Следующее фото"
+              >
+                ›
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Не Мах">
+  <defs>
+    <radialGradient id="glow" cx="28%" cy="18%" r="80%">
+      <stop stop-color="#FFFFFF" stop-opacity=".9"/>
+      <stop offset=".42" stop-color="#EAF4FF" stop-opacity=".48"/>
+      <stop offset="1" stop-color="#DCEBFA" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="bubble" x1="96" y1="64" x2="424" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DB6F2"/>
+      <stop offset=".52" stop-color="#5B95DB"/>
+      <stop offset="1" stop-color="#346EBD"/>
+    </linearGradient>
+    <linearGradient id="smallBubble" x1="314" y1="333" x2="452" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E7F2FF"/>
+      <stop offset="1" stop-color="#BFD8F8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="120" fill="#F4F8FC"/>
+  <rect width="512" height="512" rx="120" fill="url(#glow)"/>
+  <path d="M88 196c0-76.2 61.8-138 138-138h60c76.2 0 138 61.8 138 138v47c0 76.2-61.8 138-138 138h-92.8L99 449l27-95.9A137.5 137.5 0 0 1 88 258v-62Z" fill="url(#bubble)"/>
+  <path d="M334 356h69c34.2 0 62 27.8 62 62 0 26.5-21.5 48-48 48H300l34-110Z" fill="url(#smallBubble)"/>
+  <text x="256" y="282" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="132" font-weight="700" fill="#FFFFFF">НМ</text>
+</svg>

@@ -10,7 +10,7 @@ export default async function DirectJoinPage({
 
   return (
     <PageShell
-      title="Входим в семейный чат"
+      title="Входим в Не Мах"
       description="Проверяем приглашение и сразу открываем чат, если ссылка ещё действительна."
     >
       <DirectJoinClient token={token} />
