@@ -36,18 +36,19 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   }
 
   async handleConnection(client: Socket) {
-    const sessionContext = await this.authService.resolveSessionToken(
-      this.extractSessionToken(client.handshake.headers.cookie),
-      client.handshake.address,
-    );
+    const sessionContext = await this.authService.resolveSessionToken(this.extractSessionToken(client), client.handshake.address);
 
-    if (!sessionContext?.familyId) {
+    if (!sessionContext) {
       client.disconnect(true);
       return;
     }
 
     client.data.sessionContext = sessionContext;
-    client.join(this.realtimeService.getFamilyRoom(sessionContext.familyId));
+
+    if (sessionContext.familyId) {
+      client.join(this.realtimeService.getFamilyRoom(sessionContext.familyId));
+    }
+
     client.emit("session.ready", {
       familyId: sessionContext.familyId,
       userId: sessionContext.user.id,
@@ -83,12 +84,30 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
     return { ok: true, familyId: body.familyId };
   }
 
-  private extractSessionToken(cookieHeader?: string) {
-    if (!cookieHeader) {
-      return undefined;
+  private extractSessionToken(client: Socket) {
+    const authToken =
+      typeof client.handshake.auth?.sessionToken === "string" ? client.handshake.auth.sessionToken : undefined;
+
+    if (authToken) {
+      return authToken;
     }
 
-    const match = cookieHeader.match(/family_chat_session=([^;]+)/);
-    return match?.[1];
+    const queryToken =
+      typeof client.handshake.query.sessionToken === "string" ? client.handshake.query.sessionToken : undefined;
+
+    if (queryToken) {
+      return queryToken;
+    }
+
+    const cookieHeader = client.handshake.headers.cookie;
+
+    if (cookieHeader) {
+      const match = cookieHeader.match(/family_chat_session=([^;]+)/);
+      if (match?.[1]) {
+        return match[1];
+      }
+    }
+
+    return undefined;
   }
 }

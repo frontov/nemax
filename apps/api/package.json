@@ -12,8 +12,9 @@
     "seed": "tsx src/database/seeds/seed.ts",
     "start": "node dist/src/main.js",
     "start:worker": "node dist/src/worker.js",
-    "test": "jest --config ./test/jest.config.ts",
-    "test:e2e": "jest --config ./test/jest.e2e.config.ts"
+    "test:integration": "jest --config ./test/jest.config.cjs",
+    "test:e2e": "bash ./scripts/run-e2e.sh",
+    "test": "pnpm run test:integration && pnpm run test:e2e"
   },
   "prisma": {
     "schema": "src/prisma/schema.prisma"

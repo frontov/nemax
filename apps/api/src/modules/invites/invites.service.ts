@@ -79,7 +79,7 @@ export class InvitesService {
   }
 
   async createInvite(sessionContext: SessionContext, input: CreateInviteDto) {
-    const member = this.authService.assertFamilyAccess(sessionContext);
+    const member = this.authService.assertFamilyAccess(sessionContext, input.familyId);
 
     const code = randomBytes(12).toString("hex");
     const invite = await this.invitesRepository.createInvite({
@@ -98,6 +98,7 @@ export class InvitesService {
       eventType: "invite.created",
       payloadJson: {
         inviteId: invite.id,
+        familyId: member.familyId,
         role: invite.role,
       },
     });

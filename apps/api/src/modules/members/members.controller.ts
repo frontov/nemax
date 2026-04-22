@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Res, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Query, Res, UseGuards } from "@nestjs/common";
 import type { Response } from "express";
 import { CurrentSession } from "../../common/decorators/current-session.decorator";
 import { SessionGuard } from "../../common/guards/session.guard";
@@ -18,8 +18,11 @@ export class MembersController {
   ) {}
 
   @Get()
-  listMembers(@CurrentSession() sessionContext: SessionContext) {
-    return this.membersService.listMembers(sessionContext);
+  listMembers(
+    @CurrentSession() sessionContext: SessionContext,
+    @Query("familyId") familyId?: string,
+  ) {
+    return this.membersService.listMembers(sessionContext, familyId);
   }
 
   @Post("remove")
@@ -28,7 +31,7 @@ export class MembersController {
     @Body() body: RemoveMemberDto,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.membersService.removeMember(sessionContext, body.memberId);
+    const result = await this.membersService.removeMember(sessionContext, body.memberId, body.familyId);
 
     if (result.userId === sessionContext.user.id) {
       response.setHeader("Set-Cookie", this.authCookieService.clearSessionCookie());

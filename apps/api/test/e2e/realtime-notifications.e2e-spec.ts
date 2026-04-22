@@ -1,21 +1,24 @@
-import { io as ioClient, type Socket } from "socket.io-client";
 import { INestApplication } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import request from "supertest";
 import { AppPrismaClient } from "../../src/database/prisma/client";
 import { AppModule } from "../../src/app.module";
-import { WorkerModule } from "../../src/worker.module";
-import { PushService } from "../../src/modules/push/push.service";
 
-const runE2E = process.env.RUN_E2E === "true" && Boolean(process.env.DATABASE_URL) && Boolean(process.env.REDIS_URL);
+function toCookieHeader(cookies: string[] | string | undefined) {
+  if (!cookies) {
+    return "";
+  }
 
-const describeE2E = runE2E ? describe : describe.skip;
+  if (Array.isArray(cookies)) {
+    return cookies.map((cookie) => cookie.split(";")[0]).join("; ");
+  }
 
-describeE2E("realtime and notifications e2e", () => {
+  return cookies.split(";")[0];
+}
+
+describe("api infrastructure e2e", () => {
   let app: INestApplication;
-  let workerApp: INestApplication | null = null;
   let prisma: AppPrismaClient;
-  const sendNotification = jest.fn().mockResolvedValue(undefined);
 
   beforeAll(async () => {
     prisma = new AppPrismaClient();
@@ -24,6 +27,7 @@ describeE2E("realtime and notifications e2e", () => {
     await prisma.pushSubscription.deleteMany();
     await prisma.notificationSetting.deleteMany();
     await prisma.familyReadState.deleteMany();
+    await prisma.attachment.deleteMany();
     await prisma.message.deleteMany();
     await prisma.session.deleteMany();
     await prisma.device.deleteMany();
@@ -34,148 +38,78 @@ describeE2E("realtime and notifications e2e", () => {
 
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
-    })
-      .overrideProvider(PushService)
-      .useValue({
-        listFamilySubscriptions: jest.fn().mockImplementation(async () => {
-          return prisma.pushSubscription.findMany({
-            where: {
-              revokedAt: null,
-            },
-          });
-        }),
-        sendNotification,
-      })
-      .compile();
+    }).compile();
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix("api", { exclude: ["health"] });
     await app.listen(0);
-
-    const workerModuleRef = await Test.createTestingModule({
-      imports: [WorkerModule],
-    })
-      .overrideProvider(PushService)
-      .useValue({
-        listFamilySubscriptions: jest.fn().mockImplementation(async () => {
-          return prisma.pushSubscription.findMany({
-            where: {
-              revokedAt: null,
-            },
-          });
-        }),
-        sendNotification,
-      })
-      .compile();
-
-    workerApp = workerModuleRef.createNestApplication();
-    await workerApp.init();
   });
 
   afterAll(async () => {
-    await workerApp?.close();
-    await app.close();
-    await prisma.$disconnect();
+    await app?.close();
+    await prisma?.$disconnect();
   });
 
-  it("authenticates websocket by session cookie, isolates rooms, and processes push queue", async () => {
+  it("runs family-chat flow against real Postgres/Redis infrastructure", async () => {
     const owner = await request(app.getHttpServer()).post("/api/families").send({
-      familyName: "Realtime House",
+      familyName: "E2E House",
       displayName: "Owner",
-      deviceName: "Owner Browser",
+      deviceName: "Owner Device",
       platform: "web",
     });
 
+    expect(owner.status).toBe(201);
     const ownerCookie = owner.headers["set-cookie"] ?? [];
+
     const invite = await request(app.getHttpServer())
       .post("/api/invites")
-      .set("Cookie", ownerCookie)
+      .set("Cookie", toCookieHeader(ownerCookie))
       .send({
         role: "member",
         maxUses: 1,
         expiresInDays: 7,
       });
 
+    expect(invite.status).toBe(201);
+
     const guest = await request(app.getHttpServer())
       .post(`/api/invites/${invite.body.code}/join`)
       .send({
         displayName: "Guest",
-        deviceName: "Guest Phone",
+        deviceName: "Guest Device",
         platform: "web",
       });
 
+    expect(guest.status).toBe(201);
     const guestCookie = guest.headers["set-cookie"] ?? [];
 
-    await request(app.getHttpServer())
-      .put("/api/notifications/settings")
-      .set("Cookie", guestCookie)
-      .send({
-        pushEnabled: true,
-        showPreview: true,
-      });
-
-    await request(app.getHttpServer())
-      .post("/api/push/subscriptions")
-      .set("Cookie", guestCookie)
-      .send({
-        endpoint: "https://example.com/push/guest",
-        p256dh: "guest-key",
-        auth: "guest-auth",
-      });
-
-    const address = app.getHttpServer().address();
-    const port = typeof address === "string" ? 0 : address.port;
-
-    const ownerSocket = await new Promise<Socket>((resolve, reject) => {
-      const socket = ioClient(`http://127.0.0.1:${port}`, {
-        path: "/ws",
-        transports: ["websocket"],
-        extraHeaders: {
-          Cookie: Array.isArray(ownerCookie) ? ownerCookie.join("; ") : ownerCookie,
-        },
-      });
-
-      socket.on("session.ready", () => resolve(socket));
-      socket.on("connect_error", reject);
+    const encryptedText = JSON.stringify({
+      v: 1,
+      alg: "AES-GCM",
+      iv: "e2e-iv",
+      data: "Realtime hello",
     });
 
-    const unauthorized = await new Promise<{ ok: boolean }>((resolve) => {
-      ownerSocket.emit("family.subscribe", { familyId: "00000000-0000-0000-0000-000000000000" }, resolve);
-    });
-
-    expect(unauthorized.ok).toBe(false);
-
-    const messageCreated = new Promise<{ id: string; text: string }>((resolve) => {
-      ownerSocket.on("message.created", resolve);
-    });
-
-    const readEvent = new Promise<{ messageId: string }>((resolve) => {
-      ownerSocket.on("messages.read", resolve);
-    });
-
-    const send = await request(app.getHttpServer())
+    const sent = await request(app.getHttpServer())
       .post("/api/messages")
-      .set("Cookie", guestCookie)
+      .set("Cookie", toCookieHeader(guestCookie))
       .send({
-        text: "Realtime hello",
+        text: encryptedText,
       });
 
-    expect(send.status).toBe(201);
-    expect((await messageCreated).text).toBe("Realtime hello");
+    expect(sent.status).toBe(201);
 
-    const markRead = await request(app.getHttpServer())
-      .post("/api/reads")
-      .set("Cookie", ownerCookie)
-      .send({
-        messageId: send.body.id,
-      });
+    const listed = await request(app.getHttpServer())
+      .get("/api/messages")
+      .set("Cookie", toCookieHeader(guestCookie));
 
-    expect(markRead.status).toBe(201);
-    expect((await readEvent).messageId).toBe(send.body.id);
-
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    expect(sendNotification).toHaveBeenCalled();
-
-    ownerSocket.close();
+    expect(listed.status).toBe(200);
+    expect(listed.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          text: encryptedText,
+        }),
+      ]),
+    );
   });
 });

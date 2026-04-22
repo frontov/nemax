@@ -1,9 +1,11 @@
-import type { Config } from "jest";
-
-const config: Config = {
+/** @type {import("jest").Config} */
+module.exports = {
   rootDir: "..",
   testEnvironment: "node",
-  testRegex: "test/e2e/.*\\.e2e-spec\\.ts$",
+  testRegex: "test/integration/.*\\.spec\\.ts$",
+  moduleNameMapper: {
+    "^(\\.{1,2}/.*)\\.js$": "$1",
+  },
   transform: {
     "^.+\\.ts$": [
       "ts-jest",
@@ -13,7 +15,4 @@ const config: Config = {
     ],
   },
   moduleFileExtensions: ["ts", "js", "json"],
-  testTimeout: 30000,
 };
-
-export default config;

@@ -59,6 +59,60 @@ export class MessagesService {
     return messages.map(serializeMessage);
   }
 
+  private async finalizeMessageCreation(
+    sessionContext: SessionContext,
+    message: MessageWithRelations,
+    notificationText: string,
+    audit: {
+      eventType: string;
+      payloadJson: Record<string, unknown>;
+    },
+  ) {
+    const member = this.authService.assertFamilyAccess(sessionContext);
+    const serializedMessage = serializeMessage(message);
+
+    this.messagesEventsService.emitMessageCreated(member.familyId, {
+      id: serializedMessage.id,
+      text: serializedMessage.text,
+      familyId: serializedMessage.familyId,
+      senderUserId: serializedMessage.senderUserId,
+      createdAt: serializedMessage.createdAt,
+      attachments: serializedMessage.attachments,
+      sender: {
+        id: serializedMessage.sender.id,
+        displayName: serializedMessage.sender.displayName,
+      },
+      replyToMessage: serializedMessage.replyToMessage
+        ? {
+            id: serializedMessage.replyToMessage.id,
+            text: serializedMessage.replyToMessage.text,
+            sender: {
+              id: serializedMessage.replyToMessage.sender.id,
+              displayName: serializedMessage.replyToMessage.sender.displayName,
+            },
+          }
+        : null,
+    });
+
+    await this.notificationsService.enqueueMessageNotification({
+      familyId: member.familyId,
+      senderUserId: sessionContext.user.id,
+      senderDisplayName: sessionContext.user.displayName,
+      messageId: message.id,
+      text: notificationText,
+    });
+
+    await this.auditService.log({
+      familyId: member.familyId,
+      userId: sessionContext.user.id,
+      actorUserId: sessionContext.user.id,
+      eventType: audit.eventType,
+      payloadJson: audit.payloadJson,
+    });
+
+    return serializedMessage;
+  }
+
   async sendMessage(sessionContext: SessionContext, input: CreateMessageDto) {
     const member = this.authService.assertFamilyAccess(sessionContext);
 
@@ -91,50 +145,12 @@ export class MessagesService {
       clientTempId: input.clientTempId,
     });
 
-    const serializedMessage = serializeMessage(message);
-
-    this.messagesEventsService.emitMessageCreated(member.familyId, {
-      id: serializedMessage.id,
-      text: serializedMessage.text,
-      familyId: serializedMessage.familyId,
-      senderUserId: serializedMessage.senderUserId,
-      createdAt: serializedMessage.createdAt,
-      attachments: serializedMessage.attachments,
-      sender: {
-        id: serializedMessage.sender.id,
-        displayName: serializedMessage.sender.displayName,
-      },
-      replyToMessage: serializedMessage.replyToMessage
-        ? {
-            id: serializedMessage.replyToMessage.id,
-            text: serializedMessage.replyToMessage.text,
-            sender: {
-              id: serializedMessage.replyToMessage.sender.id,
-              displayName: serializedMessage.replyToMessage.sender.displayName,
-            },
-          }
-        : null,
-    });
-
-    await this.notificationsService.enqueueMessageNotification({
-      familyId: member.familyId,
-      senderUserId: sessionContext.user.id,
-      senderDisplayName: sessionContext.user.displayName,
-      messageId: message.id,
-      text: isEncryptedText(message.text) ? "Новое зашифрованное сообщение" : (message.text ?? ""),
-    });
-
-    await this.auditService.log({
-      familyId: member.familyId,
-      userId: sessionContext.user.id,
-      actorUserId: sessionContext.user.id,
+    return this.finalizeMessageCreation(sessionContext, message, "Новое зашифрованное сообщение", {
       eventType: "message.created",
       payloadJson: {
         messageId: message.id,
       },
     });
-
-    return serializedMessage;
   }
 
   async sendImageMessage(
@@ -204,50 +220,12 @@ export class MessagesService {
       attachments: input.attachments,
     });
 
-    const serializedMessage = serializeMessage(message);
-
-    this.messagesEventsService.emitMessageCreated(member.familyId, {
-      id: serializedMessage.id,
-      text: serializedMessage.text,
-      familyId: serializedMessage.familyId,
-      senderUserId: serializedMessage.senderUserId,
-      createdAt: serializedMessage.createdAt,
-      attachments: serializedMessage.attachments,
-      sender: {
-        id: serializedMessage.sender.id,
-        displayName: serializedMessage.sender.displayName,
-      },
-      replyToMessage: serializedMessage.replyToMessage
-        ? {
-            id: serializedMessage.replyToMessage.id,
-            text: serializedMessage.replyToMessage.text,
-            sender: {
-              id: serializedMessage.replyToMessage.sender.id,
-              displayName: serializedMessage.replyToMessage.sender.displayName,
-            },
-          }
-        : null,
-    });
-
-    await this.notificationsService.enqueueMessageNotification({
-      familyId: member.familyId,
-      senderUserId: sessionContext.user.id,
-      senderDisplayName: sessionContext.user.displayName,
-      messageId: message.id,
-      text: "Новое изображение",
-    });
-
-    await this.auditService.log({
-      familyId: member.familyId,
-      userId: sessionContext.user.id,
-      actorUserId: sessionContext.user.id,
+    return this.finalizeMessageCreation(sessionContext, message, "Новое изображение", {
       eventType: "message.image.created",
       payloadJson: {
         messageId: message.id,
         attachmentCount: input.attachments.length,
       },
     });
-
-    return serializedMessage;
   }
 }

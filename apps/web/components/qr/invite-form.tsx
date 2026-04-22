@@ -12,11 +12,27 @@ type InviteResponse = {
   directJoinToken?: string | null;
 };
 
+type MePayload = {
+  family?: {
+    id: string;
+    name: string;
+  } | null;
+  memberships: Array<{
+    id: string;
+    family: {
+      id: string;
+      name: string;
+    };
+  }>;
+};
+
 export function InviteForm() {
   const [invite, setInvite] = useState<InviteResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [familyKey, setFamilyKey] = useState<string | null>(null);
+  const [me, setMe] = useState<MePayload | null>(null);
+  const [selectedFamilyId, setSelectedFamilyId] = useState("");
 
   const inviteLink = useMemo(() => {
     if (!invite || typeof window === "undefined") {
@@ -35,6 +51,18 @@ export function InviteForm() {
     const url = `${window.location.origin}/join/direct/${invite.directJoinToken}`;
     return familyKey ? appendFamilyKeyToUrl(url, familyKey) : url;
   }, [familyKey, invite]);
+
+  useEffect(() => {
+    void apiClient
+      .request<MePayload>({ path: "/auth/me" })
+      .then((payload) => {
+        setMe(payload);
+        setSelectedFamilyId(payload.family?.id ?? payload.memberships[0]?.family.id ?? "");
+      })
+      .catch(() => {
+        setMe(null);
+      });
+  }, []);
 
   useEffect(() => {
     if (!directJoinLink) {
@@ -78,10 +106,18 @@ export function InviteForm() {
     try {
       const formData = new FormData(event.currentTarget);
       const key = await getOrCreateFamilyKey();
+      const familyId = String(formData.get("familyId") ?? selectedFamilyId).trim();
+
+      if (!familyId) {
+        setError("Выберите чат, в который хотите пригласить человека.");
+        return;
+      }
+
       const response = await apiClient.request<InviteResponse>({
         path: "/invites",
         method: "POST",
         body: JSON.stringify({
+          familyId,
           role: formData.get("role"),
           maxUses: Number(formData.get("maxUses") || 1),
           expiresInDays: Number(formData.get("expiresInDays") || 7),
@@ -102,6 +138,26 @@ export function InviteForm() {
       <div className="meta" style={{ gridColumn: "1 / -1" }}>
         <div className="metaLabel">Приглашение для близких</div>
         <form onSubmit={handleSubmit} className="sectionStack">
+          <label className="fieldLabel" htmlFor="inviteFamilyId">
+            Чат для приглашения
+          </label>
+          <select
+            id="inviteFamilyId"
+            name="familyId"
+            value={selectedFamilyId}
+            onChange={(event) => {
+              setSelectedFamilyId(event.target.value);
+              setInvite(null);
+              setQrDataUrl(null);
+            }}
+            required
+          >
+            {me?.memberships.map((membership) => (
+              <option key={membership.id} value={membership.family.id}>
+                {membership.family.name}
+              </option>
+            ))}
+          </select>
           <input name="role" defaultValue="member" placeholder="Роль участника" />
           <input name="maxUses" type="number" min={1} max={100} defaultValue={1} />
           <input name="expiresInDays" type="number" min={1} max={30} defaultValue={7} />

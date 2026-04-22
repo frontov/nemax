@@ -13,13 +13,13 @@ export class MembersService {
     private readonly authService: AuthService,
   ) {}
 
-  async listMembers(sessionContext: SessionContext) {
-    const member = this.authService.assertFamilyAccess(sessionContext);
+  async listMembers(sessionContext: SessionContext, familyId?: string) {
+    const member = this.authService.assertFamilyAccess(sessionContext, familyId);
     return this.membersRepository.listFamilyMembers(member.familyId);
   }
 
-  async removeMember(sessionContext: SessionContext, memberId: string) {
-    const actorMember = this.authService.assertFamilyAccess(sessionContext);
+  async removeMember(sessionContext: SessionContext, memberId: string, familyId?: string) {
+    const actorMember = this.authService.assertFamilyAccess(sessionContext, familyId);
 
     if (actorMember.role !== "owner") {
       throw new BadRequestException("Only family owner can remove members");

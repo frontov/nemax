@@ -167,6 +167,13 @@ a {
   grid-column: 1 / -1;
 }
 
+.notificationActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
 .nav {
   display: flex;
   flex-wrap: wrap;
@@ -233,6 +240,14 @@ a {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.fieldLabel {
+  margin-bottom: -6px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 form {
@@ -1123,6 +1138,14 @@ button:hover {
   }
 
   .adminDangerZone button {
+    width: 100%;
+  }
+
+  .notificationActions {
+    flex-direction: column;
+  }
+
+  .notificationActions button {
     width: 100%;
   }
 

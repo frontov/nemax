@@ -1,21 +1,13 @@
 import { PageShell } from "@/components/ui/page-shell";
+import { NotificationsClient } from "@/components/notifications/notifications-client";
 
 export default function NotificationsPage() {
   return (
     <PageShell
       title="Уведомления"
-      description="Здесь постепенно появятся спокойные и понятные настройки уведомлений для всей семьи."
+      description="Включите push-уведомления на этом устройстве, чтобы не пропускать новые сообщения."
     >
-      <section className="metaGrid">
-        <div className="meta">
-          <div className="metaLabel">Что уже сохранено</div>
-          <div>Настройки уведомлений и push-подписки уже описаны в базе данных.</div>
-        </div>
-        <div className="meta">
-          <div className="metaLabel">Что будет дальше</div>
-          <div>Тихие часы, выбор важных уведомлений и более бережный режим общения.</div>
-        </div>
-      </section>
+      <NotificationsClient />
     </PageShell>
   );
 }

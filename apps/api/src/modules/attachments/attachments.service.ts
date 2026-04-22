@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomBytes } from "crypto";
+import { createReadStream, promises as fs } from "fs";
 import { Client } from "minio";
 import type { Readable } from "stream";
 import { AuthService, type SessionContext } from "../auth/auth.service";
@@ -9,6 +10,7 @@ import { AttachmentsRepository } from "./attachments.repository";
 
 const MAX_IMAGE_SIZE_BYTES = 8 * 1024 * 1024;
 const MAX_ALBUM_IMAGES = 10;
+const MAX_ALBUM_TOTAL_SIZE_BYTES = 24 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 
 function detectImageMimeType(buffer: Buffer) {
@@ -46,6 +48,18 @@ function detectImageMimeType(buffer: Buffer) {
   }
 
   return undefined;
+}
+
+async function detectImageMimeTypeFromFile(filePath: string) {
+  const file = await fs.open(filePath, "r");
+
+  try {
+    const signatureBuffer = Buffer.alloc(16);
+    const { bytesRead } = await file.read(signatureBuffer, 0, signatureBuffer.length, 0);
+    return detectImageMimeType(signatureBuffer.subarray(0, bytesRead));
+  } finally {
+    await file.close();
+  }
 }
 
 @Injectable()
@@ -113,50 +127,73 @@ export class AttachmentsService {
       throw new BadRequestException(`Album can contain up to ${MAX_ALBUM_IMAGES} images`);
     }
 
+    const totalAlbumSize = files.reduce((sum, file) => sum + file.size, 0);
+
+    if (totalAlbumSize > MAX_ALBUM_TOTAL_SIZE_BYTES) {
+      throw new BadRequestException("Album is too large");
+    }
+
     if (!encryptedText) {
       throw new BadRequestException("Encrypted image caption is required");
     }
 
-    for (const file of files) {
-      if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
-        throw new BadRequestException("Only JPEG, PNG, WebP and GIF images are supported");
+    const uploadedKeys: string[] = [];
+    const temporaryPaths = files.map((file) => file.path).filter((filePath): filePath is string => Boolean(filePath));
+
+    try {
+      if (temporaryPaths.length !== files.length) {
+        throw new BadRequestException("Uploaded files were not persisted on disk");
       }
 
-      const detectedMimeType = detectImageMimeType(file.buffer);
+      for (const file of files) {
+        if (!ALLOWED_IMAGE_TYPES.has(file.mimetype)) {
+          throw new BadRequestException("Only JPEG, PNG, WebP and GIF images are supported");
+        }
 
-      if (detectedMimeType !== file.mimetype) {
-        throw new BadRequestException("Image content does not match its declared type");
+        const detectedMimeType = await detectImageMimeTypeFromFile(file.path);
+
+        if (detectedMimeType !== file.mimetype) {
+          throw new BadRequestException("Image content does not match its declared type");
+        }
+
+        if (file.size > MAX_IMAGE_SIZE_BYTES) {
+          throw new BadRequestException("Image is too large");
+        }
       }
 
-      if (file.size > MAX_IMAGE_SIZE_BYTES) {
-        throw new BadRequestException("Image is too large");
-      }
+      await this.ensureBucket();
+
+      const attachments = await Promise.all(
+        files.map(async (file) => {
+          const storageKey = this.createStorageKey(sessionContext, file.originalname);
+          await this.client.putObject(this.bucket, storageKey, createReadStream(file.path), file.size, {
+            "Content-Type": file.mimetype,
+            "X-Original-Name": encodeURIComponent(file.originalname),
+          });
+          uploadedKeys.push(storageKey);
+
+          return {
+            storageKey,
+            originalName: file.originalname,
+            mimeType: file.mimetype,
+            sizeBytes: BigInt(file.size),
+          };
+        }),
+      );
+
+      return this.messagesService.sendImageAlbumMessage(sessionContext, {
+        text: encryptedText,
+        replyToMessageId,
+        attachments,
+      });
+    } catch (error) {
+      await Promise.all(
+        uploadedKeys.map((storageKey) => this.client.removeObject(this.bucket, storageKey).catch(() => undefined)),
+      );
+      throw error;
+    } finally {
+      await Promise.all(temporaryPaths.map((filePath) => fs.unlink(filePath).catch(() => undefined)));
     }
-
-    await this.ensureBucket();
-
-    const attachments = await Promise.all(
-      files.map(async (file) => {
-        const storageKey = this.createStorageKey(sessionContext, file.originalname);
-        await this.client.putObject(this.bucket, storageKey, file.buffer, file.size, {
-          "Content-Type": file.mimetype,
-          "X-Original-Name": encodeURIComponent(file.originalname),
-        });
-
-        return {
-          storageKey,
-          originalName: file.originalname,
-          mimeType: file.mimetype,
-          sizeBytes: BigInt(file.size),
-        };
-      }),
-    );
-
-    return this.messagesService.sendImageAlbumMessage(sessionContext, {
-      text: encryptedText,
-      replyToMessageId,
-      attachments,
-    });
   }
 
   async getAttachmentStream(sessionContext: SessionContext, attachmentId: string) {

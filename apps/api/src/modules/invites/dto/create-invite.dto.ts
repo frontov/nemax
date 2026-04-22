@@ -3,6 +3,10 @@ import { IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 export class CreateInviteDto {
   @IsOptional()
   @IsString()
+  familyId?: string;
+
+  @IsOptional()
+  @IsString()
   role?: string;
 
   @IsOptional()
