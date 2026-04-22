@@ -41,6 +41,19 @@ export class MessagesRepository {
     });
   }
 
+  deleteMessageForFamily(messageId: string, familyId: string) {
+    return this.prisma.message.updateMany({
+      where: {
+        id: messageId,
+        familyId,
+        deletedAt: null,
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+  }
+
   async createMessage(input: {
     familyId: string;
     senderUserId: string;

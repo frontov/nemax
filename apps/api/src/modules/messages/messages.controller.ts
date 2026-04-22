@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { CurrentSession } from "../../common/decorators/current-session.decorator";
 import { createRateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { SessionGuard } from "../../common/guards/session.guard";
@@ -23,5 +23,13 @@ export class MessagesController {
     @Body() body: CreateMessageDto,
   ) {
     return this.messagesService.sendMessage(sessionContext, body);
+  }
+
+  @Delete(":id")
+  deleteMessage(
+    @CurrentSession() sessionContext: SessionContext,
+    @Param("id") messageId: string,
+  ) {
+    return this.messagesService.deleteMessage(sessionContext, messageId);
   }
 }

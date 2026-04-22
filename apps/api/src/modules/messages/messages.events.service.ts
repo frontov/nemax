@@ -8,4 +8,8 @@ export class MessagesEventsService {
   emitMessageCreated(familyId: string, message: unknown) {
     this.realtimeService.emitToFamily(familyId, "message.created", message);
   }
+
+  emitMessageDeleted(familyId: string, message: unknown) {
+    this.realtimeService.emitToFamily(familyId, "message.deleted", message);
+  }
 }

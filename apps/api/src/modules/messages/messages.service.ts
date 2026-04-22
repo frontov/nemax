@@ -1,5 +1,4 @@
-import { Injectable } from "@nestjs/common";
-import { BadRequestException } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { AuditService } from "../audit/audit.service";
 import { AuthService, type SessionContext } from "../auth/auth.service";
 import { NotificationsService } from "../notifications/notifications.service";
@@ -227,5 +226,39 @@ export class MessagesService {
         attachmentCount: input.attachments.length,
       },
     });
+  }
+
+  async deleteMessage(sessionContext: SessionContext, messageId: string) {
+    const member = this.authService.assertFamilyAccess(sessionContext);
+
+    if (member.role !== "owner") {
+      throw new BadRequestException("Only family owner can delete messages");
+    }
+
+    const result = await this.messagesRepository.deleteMessageForFamily(messageId, member.familyId);
+
+    if (result.count === 0) {
+      throw new BadRequestException("Message not found or already deleted");
+    }
+
+    const payload = {
+      id: messageId,
+      familyId: member.familyId,
+      deletedAt: new Date().toISOString(),
+    };
+
+    this.messagesEventsService.emitMessageDeleted(member.familyId, payload);
+
+    await this.auditService.log({
+      familyId: member.familyId,
+      userId: sessionContext.user.id,
+      actorUserId: sessionContext.user.id,
+      eventType: "message.deleted",
+      payloadJson: {
+        messageId,
+      },
+    });
+
+    return payload;
   }
 }

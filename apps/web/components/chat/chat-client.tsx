@@ -13,6 +13,7 @@ import { websocketClient } from "@/lib/websocket";
 
 type ChatMessage = {
   id: string;
+  familyId: string;
   text: string | null;
   createdAt: string;
   attachments: ChatAttachment[];
@@ -51,6 +52,20 @@ type MePayload = {
   user: {
     id: string;
   };
+  family?: {
+    id: string;
+    name: string;
+  } | null;
+  member?: {
+    id: string;
+    role: string;
+  } | null;
+};
+
+type DeletedMessagePayload = {
+  id: string;
+  familyId: string;
+  deletedAt: string;
 };
 
 const senderPalette = [
@@ -161,6 +176,8 @@ export function ChatClient() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [activeFamilyId, setActiveFamilyId] = useState<string | null>(null);
+  const [canDeleteMessages, setCanDeleteMessages] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [familyKey, setFamilyKey] = useState<string | null>(null);
@@ -246,8 +263,16 @@ export function ChatClient() {
 
     void apiClient
       .request<MePayload>({ path: "/auth/me" })
-      .then((payload) => setCurrentUserId(payload.user.id))
-      .catch(() => setCurrentUserId(null));
+      .then((payload) => {
+        setCurrentUserId(payload.user.id);
+        setActiveFamilyId(payload.family?.id ?? null);
+        setCanDeleteMessages(payload.member?.role === "owner");
+      })
+      .catch(() => {
+        setCurrentUserId(null);
+        setActiveFamilyId(null);
+        setCanDeleteMessages(false);
+      });
 
     void apiClient
       .request<ChatMessage[]>({ path: "/messages" })
@@ -260,20 +285,45 @@ export function ChatClient() {
   }, []);
 
   useEffect(() => {
+    if (!activeFamilyId) {
+      return;
+    }
+
     const socket = websocketClient.connect();
 
     if (!socket) {
       return;
     }
 
+    const subscribeToActiveFamily = () => {
+      socket.emit("family.subscribe", { familyId: activeFamilyId });
+    };
+
+    socket.on("connect", subscribeToActiveFamily);
+    socket.on("session.ready", subscribeToActiveFamily);
+    subscribeToActiveFamily();
+
     socket.on("message.created", (payload: ChatMessage) => {
+      if (payload.familyId !== activeFamilyId) {
+        return;
+      }
+
       appendMessage(payload);
+    });
+
+    socket.on("message.deleted", (payload: DeletedMessagePayload) => {
+      if (payload.familyId !== activeFamilyId) {
+        return;
+      }
+
+      setMessages((current) => current.filter((message) => message.id !== payload.id));
+      setReplyToMessage((current) => (current?.id === payload.id ? null : current));
     });
 
     return () => {
       socket.close();
     };
-  }, []);
+  }, [activeFamilyId]);
 
   useEffect(() => {
     if (!scrollRef.current) {
@@ -449,6 +499,28 @@ export function ChatClient() {
     textareaRef.current?.focus();
   }
 
+  async function handleDeleteMessage(message: ChatMessage) {
+    const confirmed = window.confirm("Удалить это сообщение у всех участников чата?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError(null);
+
+    try {
+      await apiClient.request<DeletedMessagePayload>({
+        path: `/messages/${encodeURIComponent(message.id)}`,
+        method: "DELETE",
+      });
+
+      setMessages((current) => current.filter((item) => item.id !== message.id));
+      setReplyToMessage((current) => (current?.id === message.id ? null : current));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Не удалось удалить сообщение");
+    }
+  }
+
   function handleAddEmoji(emoji: string) {
     setText((current) => {
       const spacer = current.trim().length === 0 ? "" : " ";
@@ -589,6 +661,20 @@ export function ChatClient() {
                             <time className="chatTime" dateTime={message.createdAt}>
                               {formatTime(message.createdAt)}
                             </time>
+                            {canDeleteMessages ? (
+                              <button
+                                type="button"
+                                className="chatDeleteButton"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleDeleteMessage(message);
+                                }}
+                                aria-label="Удалить сообщение"
+                                title="Удалить сообщение"
+                              >
+                                Удалить
+                              </button>
+                            ) : null}
                           </article>
                         </div>
                       );
