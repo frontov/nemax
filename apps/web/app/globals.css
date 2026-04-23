@@ -1217,7 +1217,7 @@ button:hover {
   }
 
   .chatComposer {
-    padding: 3px 6px max(4px, env(safe-area-inset-bottom));
+    padding: 2px 6px 0;
   }
 }
 
@@ -1232,32 +1232,7 @@ button:hover {
     border-radius: 18px;
   }
 
-  .chatPageFrame {
-    margin-top: 8px;
-  }
-
   .page:has(.chatPageFrame) .pageHeader {
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-
-  .page:has(.chatPageFrame) .eyebrow {
-    padding: 5px 9px;
-    font-size: 0.62rem;
-    letter-spacing: 0.06em;
-  }
-
-  .page:has(.chatPageFrame) h1 {
-    font-size: clamp(1.45rem, 6.8vw, 1.9rem);
-    line-height: 0.98;
-  }
-
-  .page:has(.chatPageFrame) p {
-    font-size: 0.88rem;
-    line-height: 1.38;
-  }
-
-  .page:has(.chatPageFrame) .pageHeader p {
     display: none;
   }
 
