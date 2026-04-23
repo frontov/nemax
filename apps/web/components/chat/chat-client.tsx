@@ -658,22 +658,28 @@ export function ChatClient() {
                               </div>
                             ) : null}
                             <span>{message.text ?? ""}</span>
-                            <time className="chatTime" dateTime={message.createdAt}>
-                              {formatTime(message.createdAt)}
-                            </time>
-                            {canDeleteMessages ? (
-                              <button
-                                type="button"
-                                className="chatDeleteButton"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void handleDeleteMessage(message);
-                                }}
-                                aria-label="Удалить сообщение"
-                                title="Удалить сообщение"
-                              >
-                                Удалить
-                              </button>
+                            {isLast || canDeleteMessages ? (
+                              <div className="chatMetaRow">
+                                {isLast ? (
+                                  <time className="chatTime" dateTime={message.createdAt}>
+                                    {formatTime(message.createdAt)}
+                                  </time>
+                                ) : null}
+                                {canDeleteMessages ? (
+                                  <button
+                                    type="button"
+                                    className="chatDeleteButton"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      void handleDeleteMessage(message);
+                                    }}
+                                    aria-label="Удалить сообщение"
+                                    title="Удалить сообщение"
+                                  >
+                                    Удалить
+                                  </button>
+                                ) : null}
+                              </div>
                             ) : null}
                           </article>
                         </div>

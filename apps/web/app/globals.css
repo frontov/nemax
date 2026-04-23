@@ -368,10 +368,10 @@ button:hover {
   --chat-shell-bg: #eef3f8;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   height: min(80vh, 900px);
   min-height: 0;
-  padding: 10px;
+  padding: 8px 8px 6px;
   border: 1px solid rgba(74, 96, 122, 0.1);
   border-radius: 28px;
   background:
@@ -397,7 +397,7 @@ button:hover {
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 12px 2px 4px;
+  padding: 6px 2px 2px;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   -webkit-overflow-scrolling: touch;
@@ -649,23 +649,29 @@ button:hover {
 }
 
 .chatTime {
-  display: block;
-  margin-top: 6px;
   font-size: 0.72rem;
-  text-align: right;
   color: #7388a0;
   opacity: 1;
+  white-space: nowrap;
 }
 
 .chatBubble[data-own="true"] .chatTime {
   color: #6b84a2;
 }
 
-.chatDeleteButton {
-  display: block;
-  width: fit-content;
+.chatMetaRow {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin-top: 6px;
-  margin-left: auto;
+  min-height: 1em;
+}
+
+.chatDeleteButton {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
   padding: 0;
   border: 0;
   background: transparent;
@@ -710,7 +716,7 @@ button:hover {
 .chatComposer {
   position: sticky;
   bottom: 0;
-  padding-top: 10px;
+  padding-top: 4px;
   background: linear-gradient(180deg, rgba(238, 243, 248, 0), rgba(238, 243, 248, 0.98) 24%);
 }
 
@@ -719,7 +725,7 @@ button:hover {
   gap: 4px;
   justify-items: center;
   align-self: end;
-  padding: 18px 16px 8px;
+  padding: 12px 16px 4px;
   text-align: center;
   color: #6a7d93;
 }
@@ -1106,8 +1112,8 @@ button:hover {
 
 @media (max-width: 960px) {
   .shell:has(.chatPageFrame) {
-    height: 100dvh;
-    min-height: 100dvh;
+    height: 100svh;
+    min-height: 100svh;
     overflow: hidden;
     padding: 0;
   }
@@ -1145,7 +1151,7 @@ button:hover {
     flex-direction: column;
     flex: 1 1 auto;
     width: 100%;
-    height: 100%;
+    height: 100svh;
     min-height: 0;
     overflow: hidden;
   }
@@ -1162,7 +1168,7 @@ button:hover {
   }
 
   .chatShell {
-    gap: 4px;
+    gap: 2px;
     padding: 0;
     border-left: 0;
     border-right: 0;
@@ -1174,7 +1180,7 @@ button:hover {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 6px;
     margin: 0;
-    padding: 0 6px 6px;
+    padding: 0 6px 2px;
     align-items: center;
   }
 
@@ -1188,7 +1194,7 @@ button:hover {
   }
 
   .chatScroll {
-    padding: 4px 0 0;
+    padding: 2px 0 0;
   }
 
   .chatThread {
@@ -1197,7 +1203,7 @@ button:hover {
 
   .chatEmptyState {
     gap: 2px;
-    padding: 8px 10px 4px;
+    padding: 4px 10px 2px;
   }
 
   .chatEmptyTitle {
@@ -1211,7 +1217,7 @@ button:hover {
   }
 
   .chatComposer {
-    padding: 6px 6px max(6px, env(safe-area-inset-bottom));
+    padding: 3px 6px max(4px, env(safe-area-inset-bottom));
   }
 }
 
@@ -1232,7 +1238,7 @@ button:hover {
 
   .page:has(.chatPageFrame) .pageHeader {
     gap: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 4px;
   }
 
   .page:has(.chatPageFrame) .eyebrow {
@@ -1351,12 +1357,15 @@ button:hover {
   }
 
   .chatTime {
-    margin-top: 4px;
     font-size: 0.68rem;
   }
 
-  .chatDeleteButton {
+  .chatMetaRow {
+    gap: 6px;
     margin-top: 4px;
+  }
+
+  .chatDeleteButton {
     font-size: 0.68rem;
   }
 
