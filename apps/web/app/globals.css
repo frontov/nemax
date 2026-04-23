@@ -1180,7 +1180,7 @@ button:hover {
     grid-template-columns: auto minmax(0, 1fr);
     gap: 6px;
     margin: 0;
-    padding: 0 6px 2px;
+    padding: 0 4px 1px;
     align-items: center;
   }
 
@@ -1190,7 +1190,7 @@ button:hover {
   }
 
   .chatNotices {
-    padding: 0 6px;
+    padding: 0 4px;
   }
 
   .chatScroll {
@@ -1198,7 +1198,7 @@ button:hover {
   }
 
   .chatThread {
-    padding: 0 2px;
+    padding: 0;
   }
 
   .chatEmptyState {
@@ -1223,7 +1223,7 @@ button:hover {
 
 @media (max-width: 720px) {
   .shell {
-    padding: 14px 10px 24px;
+    padding: 0;
   }
 
   .hero,
@@ -1246,12 +1246,12 @@ button:hover {
 
   .chatShell {
     height: 100%;
-    gap: 6px;
-    padding: 4px;
-    border-radius: 18px;
-    box-shadow:
-      0 12px 28px rgba(67, 87, 112, 0.1),
-      inset 0 1px 0 rgba(255, 255, 255, 0.68);
+    gap: 1px;
+    padding: 0;
+    border-top: 0;
+    border-bottom: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   .memberCard {
@@ -1280,11 +1280,11 @@ button:hover {
   }
 
   .chatThread {
-    gap: 10px;
+    gap: 6px;
   }
 
   .chatCluster {
-    gap: 3px;
+    gap: 2px;
   }
 
   .chatClusterBody {
@@ -1303,26 +1303,26 @@ button:hover {
   }
 
   .chatScroll {
-    padding: 6px 0 2px;
+    padding: 0;
     scrollbar-gutter: auto;
   }
 
   .chatBubble {
     width: fit-content;
     max-width: min(calc(100% - 2px), 96vw);
-    padding: 8px 13px 8px;
-    border-radius: 20px;
+    padding: 5px 9px 5px;
+    border-radius: 16px;
   }
 
   .chatBubble span {
-    font-size: 0.94rem;
-    line-height: 1.32;
+    font-size: 0.88rem;
+    line-height: 1.22;
   }
 
   .chatAttachments {
     gap: 3px;
-    margin: -4px -12px 4px;
-    border-radius: 16px;
+    margin: -2px -8px 1px;
+    border-radius: 12px;
   }
 
   .chatReplyBlock {
@@ -1336,8 +1336,8 @@ button:hover {
   }
 
   .chatMetaRow {
-    gap: 6px;
-    margin-top: 4px;
+    gap: 5px;
+    margin-top: 1px;
   }
 
   .chatDeleteButton {
@@ -1352,8 +1352,8 @@ button:hover {
   .chatComposerForm {
     grid-template-columns: auto auto minmax(0, 1fr);
     gap: 6px;
-    padding: 5px;
-    border-radius: 16px;
+    padding: 4px;
+    border-radius: 14px;
   }
 
   .chatComposerReply,
