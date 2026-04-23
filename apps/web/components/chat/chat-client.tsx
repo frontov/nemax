@@ -764,7 +764,7 @@ export function ChatClient() {
               onChange={(event) => setText(event.target.value)}
               onKeyDown={handleKeyDown}
               rows={2}
-              placeholder="Напишите сообщение или нажмите на пузырёк, чтобы ответить…"
+              placeholder="Напишите сообщение…"
             />
             <button type="submit" className="chatSendButton" disabled={!text.trim() || imageUploading}>
               {imageUploading ? "Грузим…" : "Отправить"}
