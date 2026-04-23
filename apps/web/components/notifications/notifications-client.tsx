@@ -17,6 +17,14 @@ type NotificationSettings = {
   quietHoursTo?: string | null;
 };
 
+type PushPublicConfig = {
+  vapidPublicKey: string;
+};
+
+function isConfiguredVapidKey(value: string | null | undefined) {
+  return Boolean(value && value !== "development-public-key");
+}
+
 function getPermissionLabel(permission: NotificationPermission | "unsupported") {
   if (permission === "granted") {
     return "разрешены";
@@ -46,6 +54,18 @@ export function NotificationsClient() {
   const [isBusy, setIsBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  async function resolveVapidPublicKey() {
+    if (isConfiguredVapidKey(pushConfig.vapidPublicKey)) {
+      return pushConfig.vapidPublicKey;
+    }
+
+    const runtimeConfig = await apiClient.request<PushPublicConfig>({
+      path: "/push/public-key",
+    });
+
+    return runtimeConfig.vapidPublicKey;
+  }
 
   useEffect(() => {
     if (!supportsPushNotifications() || !("Notification" in window)) {
@@ -94,8 +114,10 @@ export function NotificationsClient() {
         throw new Error("Этот браузер не поддерживает push-уведомления.");
       }
 
-      if (!pushConfig.vapidPublicKey || pushConfig.vapidPublicKey === "development-public-key") {
-        throw new Error("VAPID ключ не настроен. Пересоберите web с корректным NEXT_PUBLIC_VAPID_PUBLIC_KEY.");
+      const vapidPublicKey = await resolveVapidPublicKey();
+
+      if (!isConfiguredVapidKey(vapidPublicKey)) {
+        throw new Error("VAPID ключ не настроен на сервере. Проверьте VAPID_PUBLIC_KEY и VAPID_PRIVATE_KEY в .env.");
       }
 
       const nextPermission = await Notification.requestPermission();
@@ -111,7 +133,7 @@ export function NotificationsClient() {
         existingSubscription ??
         (await registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(pushConfig.vapidPublicKey),
+          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
         }));
 
       const serialized = serializePushSubscription(subscription);

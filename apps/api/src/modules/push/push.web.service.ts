@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { AuthService } from "../auth/auth.service";
 import type { SessionContext } from "../auth/auth.service";
 import { CreatePushSubscriptionDto } from "./dto/create-push-subscription.dto";
@@ -9,7 +10,14 @@ export class PushWebService {
   constructor(
     private readonly pushRepository: PushRepository,
     private readonly authService: AuthService,
+    private readonly configService: ConfigService,
   ) {}
+
+  getPublicConfig() {
+    return {
+      vapidPublicKey: this.configService.get<string>("push.publicKey") ?? "",
+    };
+  }
 
   createSubscription(sessionContext: SessionContext, input: CreatePushSubscriptionDto) {
     this.authService.assertFamilyAccess(sessionContext);

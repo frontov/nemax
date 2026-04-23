@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Post, UseGuards } from "@nestjs/common";
 import { CurrentSession } from "../../common/decorators/current-session.decorator";
 import { SessionGuard } from "../../common/guards/session.guard";
 import type { SessionContext } from "../auth/auth.service";
@@ -7,11 +7,16 @@ import { CreatePushSubscriptionDto } from "./dto/create-push-subscription.dto";
 import { PushWebService } from "./push.web.service";
 
 @Controller("push")
-@UseGuards(SessionGuard)
 export class PushController {
   constructor(private readonly pushWebService: PushWebService) {}
 
+  @Get("public-key")
+  getPublicKey() {
+    return this.pushWebService.getPublicConfig();
+  }
+
   @Post("subscriptions")
+  @UseGuards(SessionGuard)
   createSubscription(
     @CurrentSession() sessionContext: SessionContext,
     @Body() body: CreatePushSubscriptionDto,
@@ -20,6 +25,7 @@ export class PushController {
   }
 
   @Delete("subscriptions")
+  @UseGuards(SessionGuard)
   deleteSubscription(
     @CurrentSession() sessionContext: SessionContext,
     @Body() body: DeletePushSubscriptionDto,
