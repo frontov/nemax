@@ -1130,10 +1130,10 @@ button:hover {
     max-width: none;
     margin: 0;
     padding:
-      max(8px, env(safe-area-inset-top))
-      8px
-      max(8px, env(safe-area-inset-bottom))
-      8px;
+      max(6px, env(safe-area-inset-top))
+      0
+      max(6px, env(safe-area-inset-bottom))
+      0;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -1155,6 +1155,63 @@ button:hover {
     flex: 1 1 auto;
     min-height: 0;
     width: 100%;
+  }
+
+  .chatPageFrame {
+    margin-top: 0;
+  }
+
+  .chatShell {
+    gap: 4px;
+    padding: 0;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .chatFamilyPicker {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px;
+    margin: 0;
+    padding: 0 6px 6px;
+    align-items: center;
+  }
+
+  .chatFamilyPicker label {
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+  }
+
+  .chatNotices {
+    padding: 0 6px;
+  }
+
+  .chatScroll {
+    padding: 4px 0 0;
+  }
+
+  .chatThread {
+    padding: 0 2px;
+  }
+
+  .chatEmptyState {
+    gap: 2px;
+    padding: 8px 10px 4px;
+  }
+
+  .chatEmptyTitle {
+    font-size: 0.92rem;
+  }
+
+  .chatEmptyText {
+    max-width: 24ch;
+    font-size: 0.82rem;
+    line-height: 1.32;
+  }
+
+  .chatComposer {
+    padding: 6px 6px max(6px, env(safe-area-inset-bottom));
   }
 }
 
@@ -1246,7 +1303,7 @@ button:hover {
   }
 
   .chatCluster {
-    gap: 4px;
+    gap: 3px;
   }
 
   .chatClusterBody {
@@ -1271,7 +1328,7 @@ button:hover {
 
   .chatBubble {
     width: fit-content;
-    max-width: min(calc(100% - 2px), 92vw);
+    max-width: min(calc(100% - 2px), 96vw);
     padding: 8px 13px 8px;
     border-radius: 20px;
   }
@@ -1279,6 +1336,12 @@ button:hover {
   .chatBubble span {
     font-size: 0.94rem;
     line-height: 1.32;
+  }
+
+  .chatAttachments {
+    gap: 3px;
+    margin: -4px -12px 4px;
+    border-radius: 16px;
   }
 
   .chatReplyBlock {
@@ -1358,9 +1421,9 @@ button:hover {
   .chatComposerForm textarea {
     grid-column: 1 / -1;
     grid-row: 1;
-    min-height: 42px;
-    max-height: 120px;
-    padding: 10px 12px;
+    min-height: 38px;
+    max-height: 104px;
+    padding: 8px 11px;
     border-radius: 14px;
     font-size: 16px;
   }
@@ -1388,13 +1451,13 @@ button:hover {
   .chatEmojiToggle,
   .chatAttachButton,
   .chatEmojiButton {
-    width: 34px;
-    height: 34px;
-    border-radius: 11px;
+    width: 30px;
+    height: 30px;
+    border-radius: 10px;
   }
 
   .chatEmojiButton {
-    font-size: 0.92rem;
+    font-size: 0.84rem;
   }
 
   .chatImage {
