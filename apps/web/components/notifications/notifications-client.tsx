@@ -55,6 +55,26 @@ export function NotificationsClient() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  async function ensureServiceWorker() {
+    const registration = await navigator.serviceWorker.register("/sw.js");
+    await registration.update();
+    return navigator.serviceWorker.ready;
+  }
+
+  async function refreshSubscriptionState() {
+    if (!supportsPushNotifications() || !("Notification" in window)) {
+      setPermission("unsupported");
+      setIsSubscribed(false);
+      return;
+    }
+
+    setPermission(Notification.permission);
+
+    const registration = await ensureServiceWorker();
+    const subscription = await registration.pushManager.getSubscription();
+    setIsSubscribed(Boolean(subscription));
+  }
+
   async function resolveVapidPublicKey() {
     if (isConfiguredVapidKey(pushConfig.vapidPublicKey)) {
       return pushConfig.vapidPublicKey;
@@ -73,13 +93,30 @@ export function NotificationsClient() {
       return;
     }
 
-    setPermission(Notification.permission);
-
-    void navigator.serviceWorker
-      .register("/sw.js")
-      .then((registration) => registration.pushManager.getSubscription())
-      .then((subscription) => setIsSubscribed(Boolean(subscription)))
+    void refreshSubscriptionState()
       .catch(() => setError("Не удалось подготовить уведомления в браузере."));
+  }, []);
+
+  useEffect(() => {
+    if (!supportsPushNotifications() || !("Notification" in window)) {
+      return;
+    }
+
+    const refresh = () => {
+      void refreshSubscriptionState().catch(() => {
+        setError("Не удалось обновить статус push-подписки.");
+      });
+    };
+
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("online", refresh);
+
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("online", refresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -127,7 +164,7 @@ export function NotificationsClient() {
         throw new Error("Браузер не дал разрешение на уведомления.");
       }
 
-      const registration = await navigator.serviceWorker.register("/sw.js");
+      const registration = await ensureServiceWorker();
       const existingSubscription = await registration.pushManager.getSubscription();
       const subscription =
         existingSubscription ??
@@ -167,7 +204,7 @@ export function NotificationsClient() {
     setMessage(null);
 
     try {
-      const registration = await navigator.serviceWorker.getRegistration("/sw.js");
+      const registration = await ensureServiceWorker();
       const subscription = await registration?.pushManager.getSubscription();
 
       if (subscription) {

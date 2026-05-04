@@ -42,6 +42,32 @@ function serializeMessage(message: MessageWithRelations) {
   };
 }
 
+function withReadReceipts(
+  messages: Array<ReturnType<typeof serializeMessage>>,
+  readStates: Array<{ userId: string; lastReadMessageId: string | null }>,
+) {
+  const messageIndex = new Map(messages.map((message, index) => [message.id, index]));
+
+  return messages.map((message, index) => {
+    const readByUserIds = readStates
+      .filter((state) => state.userId !== message.senderUserId)
+      .filter((state) => {
+        if (!state.lastReadMessageId) {
+          return false;
+        }
+
+        const lastReadIndex = messageIndex.get(state.lastReadMessageId);
+        return typeof lastReadIndex === "number" && lastReadIndex >= index;
+      })
+      .map((state) => state.userId);
+
+    return {
+      ...message,
+      readByUserIds,
+    };
+  });
+}
+
 @Injectable()
 export class MessagesService {
   constructor(
@@ -54,8 +80,12 @@ export class MessagesService {
 
   async listMessages(sessionContext: SessionContext) {
     const member = this.authService.assertFamilyAccess(sessionContext);
-    const messages = await this.messagesRepository.listFamilyMessages(member.familyId);
-    return messages.map(serializeMessage);
+    const [messages, readStates] = await Promise.all([
+      this.messagesRepository.listFamilyMessages(member.familyId),
+      this.messagesRepository.listFamilyReadStates(member.familyId),
+    ]);
+
+    return withReadReceipts(messages.map(serializeMessage), readStates);
   }
 
   private async finalizeMessageCreation(
@@ -91,6 +121,7 @@ export class MessagesService {
             },
           }
         : null,
+      readByUserIds: [],
     });
 
     await this.notificationsService.enqueueMessageNotification({

@@ -29,18 +29,31 @@ export class PushService {
   }
 
   async sendNotification(
-    subscription: { endpoint: string; p256dh: string; auth: string },
+    subscription: { endpoint: string; p256dh: string; auth: string; userId?: string },
     payload: Record<string, unknown>,
   ) {
-    return webpush.sendNotification(
-      {
-        endpoint: subscription.endpoint,
-        keys: {
-          p256dh: subscription.p256dh,
-          auth: subscription.auth,
+    try {
+      return await webpush.sendNotification(
+        {
+          endpoint: subscription.endpoint,
+          keys: {
+            p256dh: subscription.p256dh,
+            auth: subscription.auth,
+          },
         },
-      },
-      JSON.stringify(payload),
-    );
+        JSON.stringify(payload),
+      );
+    } catch (error) {
+      const statusCode =
+        typeof error === "object" && error !== null && "statusCode" in error
+          ? Number((error as { statusCode?: unknown }).statusCode)
+          : undefined;
+
+      if ((statusCode === 404 || statusCode === 410) && subscription.userId) {
+        await this.pushRepository.revokeSubscription(subscription.endpoint, subscription.userId);
+      }
+
+      throw error;
+    }
   }
 }

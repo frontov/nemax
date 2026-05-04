@@ -107,6 +107,7 @@ export class NotificationsService {
             messageId: payload.messageId,
             title: payload.senderDisplayName,
             body: payload.text,
+            url: "/chat",
           }),
         ),
     );

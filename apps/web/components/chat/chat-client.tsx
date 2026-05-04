@@ -14,9 +14,11 @@ import { websocketClient } from "@/lib/websocket";
 type ChatMessage = {
   id: string;
   familyId: string;
+  senderUserId: string;
   text: string | null;
   createdAt: string;
   attachments: ChatAttachment[];
+  readByUserIds?: string[];
   replyToMessage?: {
     id: string;
     text: string | null;
@@ -66,6 +68,13 @@ type DeletedMessagePayload = {
   id: string;
   familyId: string;
   deletedAt: string;
+};
+
+type MessageReadPayload = {
+  familyId: string;
+  userId: string;
+  messageId: string;
+  lastReadAt: string;
 };
 
 const senderPalette = [
@@ -191,6 +200,7 @@ export function ChatClient() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const shouldAutoScrollRef = useRef(true);
   const familyKeyRef = useRef<string | null>(null);
+  const lastMarkedReadIdRef = useRef<string | null>(null);
 
   const groupedMessages = useMemo(
     () =>
@@ -256,6 +266,71 @@ export function ChatClient() {
     });
   }
 
+  function applyReadReceipt(current: ChatMessage[], payload: MessageReadPayload) {
+    const readIndex = current.findIndex((message) => message.id === payload.messageId);
+
+    if (readIndex < 0) {
+      return current;
+    }
+
+    return current.map((message, index) => {
+      if (index > readIndex || message.senderUserId === payload.userId) {
+        return message;
+      }
+
+      const readByUserIds = Array.from(new Set([...(message.readByUserIds ?? []), payload.userId]));
+      return {
+        ...message,
+        readByUserIds,
+      };
+    });
+  }
+
+  async function refreshMessages() {
+    const payload = await apiClient.request<ChatMessage[]>({ path: "/messages" });
+    const decryptedMessages = await decryptChatMessages(payload, familyKeyRef.current);
+    setMessages(decryptedMessages);
+    return decryptedMessages;
+  }
+
+  async function markMessageRead(messageId: string) {
+    if (!messageId || lastMarkedReadIdRef.current === messageId) {
+      return;
+    }
+
+    lastMarkedReadIdRef.current = messageId;
+
+    try {
+      await apiClient.request({
+        path: "/reads",
+        method: "POST",
+        body: JSON.stringify({ messageId }),
+      });
+    } catch {
+      lastMarkedReadIdRef.current = null;
+    }
+  }
+
+  function markLatestVisibleMessageAsRead(sourceMessages: ChatMessage[]) {
+    if (!currentUserId) {
+      return;
+    }
+
+    if (typeof document !== "undefined" && document.visibilityState !== "visible") {
+      return;
+    }
+
+    const latestIncomingMessage = [...sourceMessages]
+      .reverse()
+      .find((message) => message.senderUserId !== currentUserId);
+
+    if (!latestIncomingMessage) {
+      return;
+    }
+
+    void markMessageRead(latestIncomingMessage.id);
+  }
+
   useEffect(() => {
     const hashKey = storeFamilyKeyFromLocationHash();
     familyKeyRef.current = hashKey ?? getStoredFamilyKey();
@@ -277,7 +352,10 @@ export function ChatClient() {
     void apiClient
       .request<ChatMessage[]>({ path: "/messages" })
       .then((payload) => decryptChatMessages(payload, familyKeyRef.current))
-      .then(setMessages)
+      .then((decryptedMessages) => {
+        setMessages(decryptedMessages);
+        markLatestVisibleMessageAsRead(decryptedMessages);
+      })
       .catch((reason) =>
         setError(reason instanceof Error ? reason.message : "Не удалось загрузить сообщения"),
       )
@@ -309,6 +387,10 @@ export function ChatClient() {
       }
 
       appendMessage(payload);
+
+      if (payload.senderUserId !== currentUserId) {
+        void markMessageRead(payload.id);
+      }
     });
 
     socket.on("message.deleted", (payload: DeletedMessagePayload) => {
@@ -320,10 +402,55 @@ export function ChatClient() {
       setReplyToMessage((current) => (current?.id === payload.id ? null : current));
     });
 
+    socket.on("messages.read", (payload: MessageReadPayload) => {
+      if (payload.familyId !== activeFamilyId) {
+        return;
+      }
+
+      setMessages((current) => applyReadReceipt(current, payload));
+    });
+
     return () => {
-      socket.close();
+      socket.off("connect", subscribeToActiveFamily);
+      socket.off("session.ready", subscribeToActiveFamily);
+      socket.off("message.created");
+      socket.off("message.deleted");
+      socket.off("messages.read");
     };
-  }, [activeFamilyId]);
+  }, [activeFamilyId, currentUserId]);
+
+  useEffect(() => {
+    if (!activeFamilyId) {
+      return;
+    }
+
+    const refresh = () => {
+      void refreshMessages()
+        .then((decryptedMessages) => {
+          markLatestVisibleMessageAsRead(decryptedMessages);
+        })
+        .catch(() => {
+          // Ignore background refresh errors; realtime may still be active.
+        });
+    };
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        refresh();
+      }
+    }, 15000);
+
+    window.addEventListener("focus", refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", refresh);
+
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [activeFamilyId, currentUserId]);
 
   useEffect(() => {
     if (!scrollRef.current) {
@@ -339,6 +466,12 @@ export function ChatClient() {
       behavior: loading ? "auto" : "smooth",
     });
   }, [groupedMessages, loading]);
+
+  useEffect(() => {
+    if (!loading && messages.length > 0) {
+      markLatestVisibleMessageAsRead(messages);
+    }
+  }, [messages, loading, currentUserId]);
 
   useEffect(() => {
     if (!lightbox) {
@@ -397,11 +530,7 @@ export function ChatClient() {
 
       appendMessage(message);
 
-      await apiClient.request({
-        path: "/reads",
-        method: "POST",
-        body: JSON.stringify({ messageId: message.id }),
-      });
+      await markMessageRead(message.id);
     } catch (reason) {
       setText(previousText);
       setReplyToMessage(previousReply);
@@ -589,6 +718,10 @@ export function ChatClient() {
           className="chatScroll"
           onScroll={(event) => {
             shouldAutoScrollRef.current = isNearBottom(event.currentTarget);
+
+            if (shouldAutoScrollRef.current) {
+              markLatestVisibleMessageAsRead(messages);
+            }
           }}
         >
           <div className="chatThread">
@@ -611,6 +744,10 @@ export function ChatClient() {
                     {group.items.map((message, itemIndex) => {
                       const isFirst = itemIndex === 0;
                       const isLast = itemIndex === group.items.length - 1;
+                      const readByOthers = (message.readByUserIds ?? []).filter(
+                        (userId) => userId !== message.senderUserId,
+                      );
+                      const readReceipt = readByOthers.length > 0 ? "✓✓" : "✓";
 
                       return (
                         <div
@@ -662,7 +799,7 @@ export function ChatClient() {
                               <div className="chatMetaRow">
                                 {isLast ? (
                                   <time className="chatTime" dateTime={message.createdAt}>
-                                    {formatTime(message.createdAt)}
+                                    {group.isOwn ? `${readReceipt} ${formatTime(message.createdAt)}` : formatTime(message.createdAt)}
                                   </time>
                                 ) : null}
                                 {canDeleteMessages ? (

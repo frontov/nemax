@@ -30,6 +30,18 @@ export class MessagesRepository {
     });
   }
 
+  listFamilyReadStates(familyId: string) {
+    return this.prisma.familyReadState.findMany({
+      where: {
+        familyId,
+      },
+      select: {
+        userId: true,
+        lastReadMessageId: true,
+      },
+    });
+  }
+
   findActiveMessageForFamily(messageId: string, familyId: string) {
     return this.prisma.message.findFirst({
       where: {

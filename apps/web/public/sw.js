@@ -18,10 +18,12 @@ self.addEventListener("push", (event) => {
     icon: "/app-icon.svg",
     badge: "/favicon.svg",
     data: {
-      url: "/",
+      url: payload.url || "/chat",
       familyId: payload.familyId,
       messageId: payload.messageId,
     },
+    tag: payload.familyId || "family-chat",
+    renotify: true,
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
