@@ -854,10 +854,10 @@ button:hover {
 .chatAttachments {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  margin: -3px -9px 8px;
+  gap: 3px;
+  margin: -2px -8px 6px;
   overflow: hidden;
-  border-radius: 18px;
+  border-radius: 16px;
 }
 
 .chatAttachments.album-1 {
@@ -896,14 +896,14 @@ button:hover {
 }
 
 .album-1 .chatImageButton {
-  max-height: min(52vh, 420px);
+  max-height: min(44vh, 340px);
 }
 
 .album-2 .chatImageButton,
 .album-3 .chatImageButton,
 .album-4 .chatImageButton {
-  min-height: 132px;
-  max-height: 220px;
+  min-height: 116px;
+  max-height: 184px;
 }
 
 .chatLightbox {
@@ -1324,9 +1324,9 @@ button:hover {
   }
 
   .chatAttachments {
-    gap: 3px;
-    margin: -2px -8px 1px;
-    border-radius: 12px;
+    gap: 2px;
+    margin: -1px -6px 2px;
+    border-radius: 11px;
   }
 
   .chatReplyBlock {
@@ -1453,14 +1453,14 @@ button:hover {
   }
 
   .album-1 .chatImageButton {
-    max-height: min(42vh, 280px);
+    max-height: min(34vh, 220px);
   }
 
   .album-2 .chatImageButton,
   .album-3 .chatImageButton,
   .album-4 .chatImageButton {
-    min-height: 96px;
-    max-height: 168px;
+    min-height: 84px;
+    max-height: 144px;
   }
 
   .chatLightbox {

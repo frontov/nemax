@@ -77,6 +77,11 @@ type MessageReadPayload = {
   lastReadAt: string;
 };
 
+type ChatMessagesResponse = {
+  messages: ChatMessage[];
+  viewerLastReadMessageId: string | null;
+};
+
 const senderPalette = [
   "peach",
   "mint",
@@ -216,6 +221,8 @@ export function ChatClient() {
   const shouldAutoScrollRef = useRef(true);
   const familyKeyRef = useRef<string | null>(null);
   const lastMarkedReadIdRef = useRef<string | null>(null);
+  const initialScrollTargetMessageIdRef = useRef<string | null>(null);
+  const initialScrollAppliedRef = useRef(false);
 
   const groupedMessages = useMemo(
     () =>
@@ -302,10 +309,13 @@ export function ChatClient() {
   }
 
   async function refreshMessages() {
-    const payload = await apiClient.request<ChatMessage[]>({ path: "/messages" });
-    const decryptedMessages = await decryptChatMessages(payload, familyKeyRef.current);
+    const payload = await apiClient.request<ChatMessagesResponse>({ path: "/messages" });
+    const decryptedMessages = await decryptChatMessages(payload.messages, familyKeyRef.current);
     setMessages(decryptedMessages);
-    return decryptedMessages;
+    return {
+      messages: decryptedMessages,
+      viewerLastReadMessageId: payload.viewerLastReadMessageId,
+    };
   }
 
   async function markMessageRead(messageId: string) {
@@ -335,6 +345,10 @@ export function ChatClient() {
       return;
     }
 
+    if (!scrollRef.current || !isNearBottom(scrollRef.current)) {
+      return;
+    }
+
     const latestIncomingMessage = [...sourceMessages]
       .reverse()
       .find((message) => message.senderUserId !== currentUserId);
@@ -351,28 +365,36 @@ export function ChatClient() {
     familyKeyRef.current = hashKey ?? getStoredFamilyKey();
     setFamilyKey(familyKeyRef.current);
 
-    void apiClient
-      .request<MePayload>({ path: "/auth/me" })
-      .then((payload) => {
-        setCurrentUserId(payload.user.id);
-        setActiveFamilyId(payload.family?.id ?? null);
-        setCanDeleteMessages(payload.member?.role === "owner");
-      })
-      .catch(() => {
-        setCurrentUserId(null);
-        setActiveFamilyId(null);
-        setCanDeleteMessages(false);
-      });
+    void Promise.all([
+      apiClient.request<MePayload>({ path: "/auth/me" }),
+      apiClient.request<ChatMessagesResponse>({ path: "/messages" }),
+    ])
+      .then(async ([mePayload, messagesPayload]) => {
+        setCurrentUserId(mePayload.user.id);
+        setActiveFamilyId(mePayload.family?.id ?? null);
+        setCanDeleteMessages(mePayload.member?.role === "owner");
 
-    void apiClient
-      .request<ChatMessage[]>({ path: "/messages" })
-      .then((payload) => decryptChatMessages(payload, familyKeyRef.current))
-      .then((decryptedMessages) => {
+        const decryptedMessages = await decryptChatMessages(messagesPayload.messages, familyKeyRef.current);
         setMessages(decryptedMessages);
-        markLatestVisibleMessageAsRead(decryptedMessages);
+
+        const lastMessageId = decryptedMessages.at(-1)?.id ?? null;
+        const initialTargetMessageId =
+          messagesPayload.viewerLastReadMessageId &&
+          messagesPayload.viewerLastReadMessageId !== lastMessageId
+            ? messagesPayload.viewerLastReadMessageId
+            : null;
+
+        initialScrollTargetMessageIdRef.current = initialTargetMessageId;
+        initialScrollAppliedRef.current = false;
+        shouldAutoScrollRef.current = !initialTargetMessageId;
       })
       .catch((reason) =>
-        setError(reason instanceof Error ? reason.message : "Не удалось загрузить сообщения"),
+        {
+          setCurrentUserId(null);
+          setActiveFamilyId(null);
+          setCanDeleteMessages(false);
+          setError(reason instanceof Error ? reason.message : "Не удалось загрузить сообщения");
+        },
       )
       .finally(() => setLoading(false));
   }, []);
@@ -403,7 +425,11 @@ export function ChatClient() {
 
       appendMessage(payload);
 
-      if (payload.senderUserId !== currentUserId) {
+      if (
+        payload.senderUserId !== currentUserId &&
+        scrollRef.current &&
+        isNearBottom(scrollRef.current)
+      ) {
         void markMessageRead(payload.id);
       }
     });
@@ -441,8 +467,8 @@ export function ChatClient() {
 
     const refresh = () => {
       void refreshMessages()
-        .then((decryptedMessages) => {
-          markLatestVisibleMessageAsRead(decryptedMessages);
+        .then((payload) => {
+          markLatestVisibleMessageAsRead(payload.messages);
         })
         .catch(() => {
           // Ignore background refresh errors; realtime may still be active.
@@ -466,6 +492,35 @@ export function ChatClient() {
       document.removeEventListener("visibilitychange", refresh);
     };
   }, [activeFamilyId, currentUserId]);
+
+  useEffect(() => {
+    if (!scrollRef.current || loading || initialScrollAppliedRef.current) {
+      return;
+    }
+
+    if (!initialScrollTargetMessageIdRef.current) {
+      initialScrollAppliedRef.current = true;
+      return;
+    }
+
+    const targetElement = scrollRef.current.querySelector<HTMLElement>(
+      `[data-message-id="${initialScrollTargetMessageIdRef.current}"]`,
+    );
+
+    if (!targetElement) {
+      return;
+    }
+
+    shouldAutoScrollRef.current = false;
+    initialScrollAppliedRef.current = true;
+
+    requestAnimationFrame(() => {
+      targetElement.scrollIntoView({
+        block: "center",
+        behavior: "auto",
+      });
+    });
+  }, [groupedMessages, loading]);
 
   useEffect(() => {
     if (!scrollRef.current) {
@@ -768,6 +823,7 @@ export function ChatClient() {
                         <div
                           key={message.id}
                           className={`chatRow ${group.isOwn ? "isOwn" : "isOther"}`}
+                          data-message-id={message.id}
                         >
                           <article
                             className={`chatBubble tone-${group.tone} ${isFirst ? "isFirst" : ""} ${isLast ? "isLast hasTail" : ""}`}
@@ -812,6 +868,7 @@ export function ChatClient() {
                                       width={attachment.width ?? undefined}
                                       height={attachment.height ?? undefined}
                                       loading="lazy"
+                                      decoding="async"
                                     />
                                   </button>
                                 ))}

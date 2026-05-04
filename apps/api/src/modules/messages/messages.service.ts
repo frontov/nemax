@@ -21,6 +21,11 @@ function isEncryptedText(value: string | null | undefined) {
 
 type MessageWithRelations = Awaited<ReturnType<MessagesRepository["listFamilyMessages"]>>[number];
 
+type ReadState = {
+  userId: string;
+  lastReadMessageId: string | null;
+};
+
 function serializeMessage(message: MessageWithRelations) {
   return {
     ...message,
@@ -44,7 +49,7 @@ function serializeMessage(message: MessageWithRelations) {
 
 function withReadReceipts(
   messages: Array<ReturnType<typeof serializeMessage>>,
-  readStates: Array<{ userId: string; lastReadMessageId: string | null }>,
+  readStates: ReadState[],
 ) {
   const messageIndex = new Map(messages.map((message, index) => [message.id, index]));
 
@@ -85,7 +90,11 @@ export class MessagesService {
       this.messagesRepository.listFamilyReadStates(member.familyId),
     ]);
 
-    return withReadReceipts(messages.map(serializeMessage), readStates);
+    return {
+      messages: withReadReceipts(messages.map(serializeMessage), readStates),
+      viewerLastReadMessageId:
+        readStates.find((state) => state.userId === sessionContext.user.id)?.lastReadMessageId ?? null,
+    };
   }
 
   private async finalizeMessageCreation(
