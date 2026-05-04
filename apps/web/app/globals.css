@@ -871,6 +871,7 @@ button:hover {
 .chatImageButton {
   display: block;
   min-width: 0;
+  width: 100%;
   padding: 0;
   border: 0;
   border-radius: 0;
@@ -889,17 +890,20 @@ button:hover {
   display: block;
   width: 100%;
   height: 100%;
-  min-height: 126px;
-  max-height: 360px;
-  aspect-ratio: 1 / 1;
   object-fit: cover;
   border: 0;
   background: rgba(255, 255, 255, 0.4);
 }
 
-.album-1 .chatImage {
-  aspect-ratio: 4 / 3;
-  max-height: 420px;
+.album-1 .chatImageButton {
+  max-height: min(52vh, 420px);
+}
+
+.album-2 .chatImageButton,
+.album-3 .chatImageButton,
+.album-4 .chatImageButton {
+  min-height: 132px;
+  max-height: 220px;
 }
 
 .chatLightbox {
@@ -1445,12 +1449,18 @@ button:hover {
   }
 
   .chatImage {
-    min-height: 92px;
-    max-height: 220px;
+    min-height: 0;
   }
 
-  .album-1 .chatImage {
-    max-height: 280px;
+  .album-1 .chatImageButton {
+    max-height: min(42vh, 280px);
+  }
+
+  .album-2 .chatImageButton,
+  .album-3 .chatImageButton,
+  .album-4 .chatImageButton {
+    min-height: 96px;
+    max-height: 168px;
   }
 
   .chatLightbox {

@@ -62,6 +62,93 @@ async function detectImageMimeTypeFromFile(filePath: string) {
   }
 }
 
+async function getImageDimensionsFromFile(filePath: string, mimeType: string) {
+  const fileBuffer = await fs.readFile(filePath);
+
+  if (mimeType === "image/png" && fileBuffer.length >= 24) {
+    return {
+      width: fileBuffer.readUInt32BE(16),
+      height: fileBuffer.readUInt32BE(20),
+    };
+  }
+
+  if (mimeType === "image/gif" && fileBuffer.length >= 10) {
+    return {
+      width: fileBuffer.readUInt16LE(6),
+      height: fileBuffer.readUInt16LE(8),
+    };
+  }
+
+  if (mimeType === "image/webp" && fileBuffer.length >= 30) {
+    const chunkType = fileBuffer.subarray(12, 16).toString("ascii");
+
+    if (chunkType === "VP8X") {
+      return {
+        width: 1 + fileBuffer.readUIntLE(24, 3),
+        height: 1 + fileBuffer.readUIntLE(27, 3),
+      };
+    }
+
+    if (chunkType === "VP8 " && fileBuffer.length >= 30) {
+      return {
+        width: fileBuffer.readUInt16LE(26),
+        height: fileBuffer.readUInt16LE(28),
+      };
+    }
+
+    if (chunkType === "VP8L" && fileBuffer.length >= 25) {
+      const bits = fileBuffer.readUInt32LE(21);
+      return {
+        width: (bits & 0x3fff) + 1,
+        height: ((bits >> 14) & 0x3fff) + 1,
+      };
+    }
+  }
+
+  if (mimeType === "image/jpeg") {
+    let offset = 2;
+
+    while (offset + 9 < fileBuffer.length) {
+      if (fileBuffer[offset] !== 0xff) {
+        offset += 1;
+        continue;
+      }
+
+      const marker = fileBuffer[offset + 1];
+      const isStartOfFrame =
+        marker >= 0xc0 &&
+        marker <= 0xcf &&
+        marker !== 0xc4 &&
+        marker !== 0xc8 &&
+        marker !== 0xcc;
+
+      if (isStartOfFrame) {
+        return {
+          height: fileBuffer.readUInt16BE(offset + 5),
+          width: fileBuffer.readUInt16BE(offset + 7),
+        };
+      }
+
+      if (offset + 4 > fileBuffer.length) {
+        break;
+      }
+
+      const segmentLength = fileBuffer.readUInt16BE(offset + 2);
+
+      if (segmentLength < 2) {
+        break;
+      }
+
+      offset += 2 + segmentLength;
+    }
+  }
+
+  return {
+    width: null,
+    height: null,
+  };
+}
+
 @Injectable()
 export class AttachmentsService {
   private readonly client: Client;
@@ -166,6 +253,7 @@ export class AttachmentsService {
       const attachments = await Promise.all(
         files.map(async (file) => {
           const storageKey = this.createStorageKey(sessionContext, file.originalname);
+          const dimensions = await getImageDimensionsFromFile(file.path, file.mimetype);
           await this.client.putObject(this.bucket, storageKey, createReadStream(file.path), file.size, {
             "Content-Type": file.mimetype,
             "X-Original-Name": encodeURIComponent(file.originalname),
@@ -177,6 +265,8 @@ export class AttachmentsService {
             originalName: file.originalname,
             mimeType: file.mimetype,
             sizeBytes: BigInt(file.size),
+            width: dimensions.width,
+            height: dimensions.height,
           };
         }),
       );

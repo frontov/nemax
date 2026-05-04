@@ -132,6 +132,21 @@ function getDayKey(value: string) {
   return `${year}-${month}-${day}`;
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getAttachmentDisplayAspectRatio(attachment: ChatAttachment, isSingle: boolean) {
+  if (!attachment.width || !attachment.height) {
+    return isSingle ? "4 / 3" : "1 / 1";
+  }
+
+  const sourceRatio = attachment.width / attachment.height;
+  const normalizedRatio = isSingle ? clamp(sourceRatio, 0.72, 1.6) : clamp(sourceRatio, 0.82, 1.25);
+
+  return `${normalizedRatio}`;
+}
+
 function isNearBottom(element: HTMLDivElement) {
   return element.scrollHeight - element.scrollTop - element.clientHeight < 72;
 }
@@ -779,6 +794,12 @@ export function ChatClient() {
                                     key={attachment.id}
                                     type="button"
                                     className="chatImageButton"
+                                    style={{
+                                      aspectRatio: getAttachmentDisplayAspectRatio(
+                                        attachment,
+                                        message.attachments.length === 1,
+                                      ),
+                                    }}
                                     onClick={(event) => {
                                       event.stopPropagation();
                                       openLightbox(message.attachments, attachmentIndex);
@@ -788,6 +809,8 @@ export function ChatClient() {
                                       src={attachment.url}
                                       alt={attachment.originalName}
                                       className="chatImage"
+                                      width={attachment.width ?? undefined}
+                                      height={attachment.height ?? undefined}
                                       loading="lazy"
                                     />
                                   </button>
@@ -941,6 +964,8 @@ export function ChatClient() {
               src={lightbox.attachments[lightbox.index]?.url}
               alt={lightbox.attachments[lightbox.index]?.originalName ?? "Фото"}
               className="chatLightboxImage"
+              width={lightbox.attachments[lightbox.index]?.width ?? undefined}
+              height={lightbox.attachments[lightbox.index]?.height ?? undefined}
             />
             {lightbox.attachments.length > 1 ? (
               <button
