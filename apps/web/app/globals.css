@@ -436,6 +436,36 @@ button:hover {
   text-transform: capitalize;
 }
 
+.chatUnreadDivider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 2px 0 8px;
+}
+
+.chatUnreadDivider::before,
+.chatUnreadDivider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: rgba(211, 92, 70, 0.22);
+}
+
+.chatUnreadDivider span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 243, 240, 0.94);
+  color: #c45b45;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 .chatCluster {
   display: flex;
   gap: 7px;
@@ -460,15 +490,34 @@ button:hover {
 
 .chatRow {
   display: flex;
+  flex-direction: column;
   max-width: 100%;
 }
 
 .chatRow.isOwn {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 
 .chatRow.isOther {
-  justify-content: flex-start;
+  align-items: flex-start;
+}
+
+.chatLoadMoreButton {
+  justify-self: center;
+  padding: 8px 14px;
+  border: 1px solid rgba(120, 144, 169, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  color: #64778d;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.chatLoadMoreButton.isNewer {
+  margin-top: 4px;
+  background: rgba(243, 249, 255, 0.9);
+  color: #567493;
 }
 
 .chatBubble {
@@ -1285,6 +1334,20 @@ button:hover {
 
   .chatThread {
     gap: 6px;
+  }
+
+  .chatLoadMoreButton {
+    padding: 7px 12px;
+    font-size: 0.72rem;
+  }
+
+  .chatUnreadDivider {
+    margin: 0 0 6px;
+  }
+
+  .chatUnreadDivider span {
+    padding: 3px 8px;
+    font-size: 0.64rem;
   }
 
   .chatCluster {

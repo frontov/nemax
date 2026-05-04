@@ -9,6 +9,7 @@
     "prisma:generate": "pnpm --filter @family-chat/api prisma:generate",
     "prisma:migrate:dev": "pnpm --filter @family-chat/api prisma:migrate:dev",
     "seed": "pnpm --filter @family-chat/api seed",
+    "backfill:chat": "pnpm --filter @family-chat/api backfill:chat",
     "test": "turbo run test"
   },
   "pnpm": {

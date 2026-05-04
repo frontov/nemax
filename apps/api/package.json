@@ -10,6 +10,7 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "seed": "tsx src/database/seeds/seed.ts",
+    "backfill:chat": "tsx src/database/scripts/backfill-chat-history.ts",
     "start": "node dist/src/main.js",
     "start:worker": "node dist/src/worker.js",
     "test:integration": "jest --config ./test/jest.config.cjs",

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
 import { CurrentSession } from "../../common/decorators/current-session.decorator";
 import { createRateLimitGuard } from "../../common/guards/rate-limit.guard";
 import { SessionGuard } from "../../common/guards/session.guard";
@@ -12,8 +12,19 @@ export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
   @Get()
-  listMessages(@CurrentSession() sessionContext: SessionContext) {
-    return this.messagesService.listMessages(sessionContext);
+  listMessages(
+    @CurrentSession() sessionContext: SessionContext,
+    @Query("beforeMessageId") beforeMessageId?: string,
+    @Query("afterMessageId") afterMessageId?: string,
+    @Query("take") takeValue?: string,
+  ) {
+    const parsedTake = takeValue ? Number.parseInt(takeValue, 10) : undefined;
+
+    return this.messagesService.listMessages(sessionContext, {
+      beforeMessageId,
+      afterMessageId,
+      take: parsedTake,
+    });
   }
 
   @Post()

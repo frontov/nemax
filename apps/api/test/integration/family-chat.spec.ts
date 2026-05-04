@@ -668,7 +668,7 @@ describe("family-chat MVP flows", () => {
     },
   } as unknown as Pick<
     MessagesRepository,
-    "listFamilyMessages" | "findActiveMessageForFamily" | "createMessage"
+    "listRecentFamilyMessages" | "findActiveMessageForFamily" | "createMessage"
   >;
 
   const membersRepository = {

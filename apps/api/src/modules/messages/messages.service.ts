@@ -19,14 +19,22 @@ function isEncryptedText(value: string | null | undefined) {
   }
 }
 
-type MessageWithRelations = Awaited<ReturnType<MessagesRepository["listFamilyMessages"]>>[number];
+type MessageWithRelations = NonNullable<Awaited<ReturnType<MessagesRepository["findActiveMessageForFamily"]>>>;
+type MessageRecord =
+  | Awaited<ReturnType<MessagesRepository["listRecentFamilyMessages"]>>[number]
+  | NonNullable<Awaited<ReturnType<MessagesRepository["listAroundFamilyMessage"]>>>["anchorMessage"];
 
 type ReadState = {
   userId: string;
   lastReadMessageId: string | null;
+  lastReadAt: Date | null;
+  lastReadMessage: {
+    id: string;
+    createdAt: Date;
+  } | null;
 };
 
-function serializeMessage(message: MessageWithRelations) {
+function serializeMessage(message: MessageRecord) {
   return {
     ...message,
     attachments: message.attachments.map((attachment) => ({
@@ -51,18 +59,29 @@ function withReadReceipts(
   messages: Array<ReturnType<typeof serializeMessage>>,
   readStates: ReadState[],
 ) {
-  const messageIndex = new Map(messages.map((message, index) => [message.id, index]));
+  function compareMessagePosition(
+    left: { createdAt: Date | string; id: string },
+    right: { createdAt: Date | string; id: string },
+  ) {
+    const leftTime = new Date(left.createdAt).getTime();
+    const rightTime = new Date(right.createdAt).getTime();
 
-  return messages.map((message, index) => {
+    if (leftTime !== rightTime) {
+      return leftTime - rightTime;
+    }
+
+    return left.id.localeCompare(right.id);
+  }
+
+  return messages.map((message) => {
     const readByUserIds = readStates
       .filter((state) => state.userId !== message.senderUserId)
       .filter((state) => {
-        if (!state.lastReadMessageId) {
+        if (!state.lastReadMessageId || !state.lastReadMessage) {
           return false;
         }
 
-        const lastReadIndex = messageIndex.get(state.lastReadMessageId);
-        return typeof lastReadIndex === "number" && lastReadIndex >= index;
+        return compareMessagePosition(state.lastReadMessage, message) >= 0;
       })
       .map((state) => state.userId);
 
@@ -71,6 +90,14 @@ function withReadReceipts(
       readByUserIds,
     };
   });
+}
+
+function clampTake(value: number | undefined) {
+  if (!value || Number.isNaN(value)) {
+    return 40;
+  }
+
+  return Math.min(Math.max(value, 20), 80);
 }
 
 @Injectable()
@@ -83,17 +110,85 @@ export class MessagesService {
     private readonly authService: AuthService,
   ) {}
 
-  async listMessages(sessionContext: SessionContext) {
+  async listMessages(
+    sessionContext: SessionContext,
+    input?: {
+      beforeMessageId?: string;
+      afterMessageId?: string;
+      take?: number;
+    },
+  ) {
     const member = this.authService.assertFamilyAccess(sessionContext);
-    const [messages, readStates] = await Promise.all([
-      this.messagesRepository.listFamilyMessages(member.familyId),
-      this.messagesRepository.listFamilyReadStates(member.familyId),
-    ]);
+    const take = clampTake(input?.take);
+    const readStates = await this.messagesRepository.listFamilyReadStates(member.familyId);
+    const viewerLastReadMessageId =
+      readStates.find((state) => state.userId === sessionContext.user.id)?.lastReadMessageId ?? null;
+    let pageMessages: MessageRecord[] = [];
+    let olderCursor: string | null = null;
+    let newerCursor: string | null = null;
+
+    if (input?.beforeMessageId) {
+      const result = await this.messagesRepository.listOlderFamilyMessages(
+        member.familyId,
+        input.beforeMessageId,
+        take,
+      );
+
+      if (result) {
+        const hasOlder = result.messages.length > take;
+        pageMessages = result.messages.slice(0, take).reverse();
+        olderCursor = hasOlder ? pageMessages[0]?.id ?? null : null;
+      }
+    } else if (input?.afterMessageId) {
+      const result = await this.messagesRepository.listNewerFamilyMessages(
+        member.familyId,
+        input.afterMessageId,
+        take,
+      );
+
+      if (result) {
+        const hasNewer = result.messages.length > take;
+        pageMessages = result.messages.slice(0, take);
+        newerCursor = hasNewer ? pageMessages.at(-1)?.id ?? null : null;
+      }
+    } else if (viewerLastReadMessageId) {
+      const aroundBefore = Math.max(Math.floor(take * 0.4), 8);
+      const aroundAfter = Math.max(take - aroundBefore - 1, 8);
+      const result = await this.messagesRepository.listAroundFamilyMessage(
+        member.familyId,
+        viewerLastReadMessageId,
+        aroundBefore,
+        aroundAfter,
+      );
+
+      if (result) {
+        const hasOlder = result.olderMessages.length > aroundBefore;
+        const hasNewer = result.newerMessages.length > aroundAfter;
+        pageMessages = [
+          ...result.olderMessages.slice(0, aroundBefore).reverse(),
+          result.anchorMessage,
+          ...result.newerMessages.slice(0, aroundAfter),
+        ];
+        olderCursor = hasOlder ? pageMessages[0]?.id ?? null : null;
+        newerCursor = hasNewer ? pageMessages.at(-1)?.id ?? null : null;
+      }
+    }
+
+    if (pageMessages.length === 0) {
+      const recentMessages = await this.messagesRepository.listRecentFamilyMessages(member.familyId, take);
+      const hasOlder = recentMessages.length > take;
+      pageMessages = recentMessages.slice(0, take).reverse();
+      olderCursor = hasOlder ? pageMessages[0]?.id ?? null : null;
+      newerCursor = null;
+    }
 
     return {
-      messages: withReadReceipts(messages.map(serializeMessage), readStates),
-      viewerLastReadMessageId:
-        readStates.find((state) => state.userId === sessionContext.user.id)?.lastReadMessageId ?? null,
+      messages: withReadReceipts(pageMessages.map(serializeMessage), readStates),
+      viewerLastReadMessageId,
+      page: {
+        olderCursor,
+        newerCursor,
+      },
     };
   }
 

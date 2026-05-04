@@ -80,6 +80,10 @@ type MessageReadPayload = {
 type ChatMessagesResponse = {
   messages: ChatMessage[];
   viewerLastReadMessageId: string | null;
+  page: {
+    olderCursor: string | null;
+    newerCursor: string | null;
+  };
 };
 
 const senderPalette = [
@@ -211,6 +215,11 @@ export function ChatClient() {
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [familyKey, setFamilyKey] = useState<string | null>(null);
   const [imageUploading, setImageUploading] = useState(false);
+  const [olderCursor, setOlderCursor] = useState<string | null>(null);
+  const [newerCursor, setNewerCursor] = useState<string | null>(null);
+  const [viewerLastReadMessageId, setViewerLastReadMessageId] = useState<string | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [loadingNewer, setLoadingNewer] = useState(false);
   const [lightbox, setLightbox] = useState<{
     attachments: ChatAttachment[];
     index: number;
@@ -223,6 +232,8 @@ export function ChatClient() {
   const lastMarkedReadIdRef = useRef<string | null>(null);
   const initialScrollTargetMessageIdRef = useRef<string | null>(null);
   const initialScrollAppliedRef = useRef(false);
+  const isRefreshingRef = useRef(false);
+  const messagesRef = useRef<ChatMessage[]>([]);
 
   const groupedMessages = useMemo(
     () =>
@@ -263,6 +274,32 @@ export function ChatClient() {
     [messages, currentUserId],
   );
 
+  const firstUnreadMessageId = useMemo(() => {
+    if (!currentUserId || messages.length === 0) {
+      return null;
+    }
+
+    const firstIncomingMessage = messages.find((message) => message.senderUserId !== currentUserId);
+
+    if (!viewerLastReadMessageId) {
+      return firstIncomingMessage?.id ?? null;
+    }
+
+    const lastReadIndex = messages.findIndex((message) => message.id === viewerLastReadMessageId);
+
+    if (lastReadIndex < 0) {
+      return firstIncomingMessage?.id ?? null;
+    }
+
+    return (
+      messages.slice(lastReadIndex + 1).find((message) => message.senderUserId !== currentUserId)?.id ?? null
+    );
+  }, [messages, currentUserId, viewerLastReadMessageId]);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
   function mergeMessage(current: ChatMessage[], message: ChatMessage) {
     const existingIndex = current.findIndex((item) => item.id === message.id);
 
@@ -276,6 +313,36 @@ export function ChatClient() {
     }
 
     return [...current, message];
+  }
+
+  function mergeMessagePages(current: ChatMessage[], incoming: ChatMessage[]) {
+    const merged = [...current];
+
+    for (const message of incoming) {
+      const existingIndex = merged.findIndex((item) => item.id === message.id);
+
+      if (existingIndex >= 0) {
+        merged[existingIndex] = {
+          ...merged[existingIndex],
+          ...message,
+        };
+        continue;
+      }
+
+      merged.push(message);
+    }
+
+    merged.sort((left, right) => {
+      const timeDelta = new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime();
+
+      if (timeDelta !== 0) {
+        return timeDelta;
+      }
+
+      return left.id.localeCompare(right.id);
+    });
+
+    return merged;
   }
 
   function appendMessage(message: ChatMessage) {
@@ -308,14 +375,118 @@ export function ChatClient() {
     });
   }
 
+  async function requestMessages(query?: Record<string, string | number | undefined>) {
+    const search = new URLSearchParams();
+
+    for (const [key, value] of Object.entries(query ?? {})) {
+      if (value === undefined || value === null || value === "") {
+        continue;
+      }
+
+      search.set(key, String(value));
+    }
+
+    const path = search.size > 0 ? `/messages?${search.toString()}` : "/messages";
+    return apiClient.request<ChatMessagesResponse>({ path });
+  }
+
   async function refreshMessages() {
-    const payload = await apiClient.request<ChatMessagesResponse>({ path: "/messages" });
-    const decryptedMessages = await decryptChatMessages(payload.messages, familyKeyRef.current);
-    setMessages(decryptedMessages);
-    return {
-      messages: decryptedMessages,
-      viewerLastReadMessageId: payload.viewerLastReadMessageId,
-    };
+    if (isRefreshingRef.current) {
+      return null;
+    }
+
+    const latestLoadedMessageId = messagesRef.current.at(-1)?.id;
+
+    if (!latestLoadedMessageId) {
+      return null;
+    }
+
+    isRefreshingRef.current = true;
+
+    try {
+      const payload = await requestMessages({
+        afterMessageId: latestLoadedMessageId,
+        take: 40,
+      });
+      const decryptedMessages = await decryptChatMessages(payload.messages, familyKeyRef.current);
+
+      if (decryptedMessages.length > 0) {
+        setMessages((current) => mergeMessagePages(current, decryptedMessages));
+      }
+
+      setViewerLastReadMessageId(payload.viewerLastReadMessageId);
+      setNewerCursor(payload.page.newerCursor);
+
+      return {
+        messages: decryptedMessages,
+        viewerLastReadMessageId: payload.viewerLastReadMessageId,
+      };
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }
+
+  async function loadOlderMessages() {
+    if (!olderCursor || loadingOlder) {
+      return;
+    }
+
+    const scrollElement = scrollRef.current;
+    const previousScrollHeight = scrollElement?.scrollHeight ?? 0;
+    setLoadingOlder(true);
+
+    try {
+      const payload = await requestMessages({
+        beforeMessageId: olderCursor,
+        take: 40,
+      });
+      const decryptedMessages = await decryptChatMessages(payload.messages, familyKeyRef.current);
+
+      if (decryptedMessages.length === 0) {
+        setOlderCursor(null);
+        return;
+      }
+
+      setMessages((current) => mergeMessagePages(current, decryptedMessages));
+      setOlderCursor(payload.page.olderCursor);
+      setViewerLastReadMessageId(payload.viewerLastReadMessageId);
+
+      requestAnimationFrame(() => {
+        if (!scrollElement) {
+          return;
+        }
+
+        const nextScrollHeight = scrollElement.scrollHeight;
+        scrollElement.scrollTop += nextScrollHeight - previousScrollHeight;
+      });
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
+
+  async function loadNewerMessages() {
+    if (!newerCursor || loadingNewer) {
+      return;
+    }
+
+    setLoadingNewer(true);
+
+    try {
+      const payload = await requestMessages({
+        afterMessageId: newerCursor,
+        take: 40,
+      });
+      const decryptedMessages = await decryptChatMessages(payload.messages, familyKeyRef.current);
+
+      if (decryptedMessages.length > 0) {
+        setMessages((current) => mergeMessagePages(current, decryptedMessages));
+      }
+
+      setNewerCursor(payload.page.newerCursor);
+      setViewerLastReadMessageId(payload.viewerLastReadMessageId);
+    } finally {
+      setLoadingNewer(false);
+    }
   }
 
   async function markMessageRead(messageId: string) {
@@ -331,6 +502,7 @@ export function ChatClient() {
         method: "POST",
         body: JSON.stringify({ messageId }),
       });
+      setViewerLastReadMessageId(messageId);
     } catch {
       lastMarkedReadIdRef.current = null;
     }
@@ -367,7 +539,7 @@ export function ChatClient() {
 
     void Promise.all([
       apiClient.request<MePayload>({ path: "/auth/me" }),
-      apiClient.request<ChatMessagesResponse>({ path: "/messages" }),
+      requestMessages({ take: 40 }),
     ])
       .then(async ([mePayload, messagesPayload]) => {
         setCurrentUserId(mePayload.user.id);
@@ -387,6 +559,9 @@ export function ChatClient() {
         initialScrollTargetMessageIdRef.current = initialTargetMessageId;
         initialScrollAppliedRef.current = false;
         shouldAutoScrollRef.current = !initialTargetMessageId;
+        setOlderCursor(messagesPayload.page.olderCursor);
+        setNewerCursor(messagesPayload.page.newerCursor);
+        setViewerLastReadMessageId(messagesPayload.viewerLastReadMessageId);
       })
       .catch((reason) =>
         {
@@ -448,6 +623,10 @@ export function ChatClient() {
         return;
       }
 
+      if (payload.userId === currentUserId) {
+        setViewerLastReadMessageId(payload.messageId);
+      }
+
       setMessages((current) => applyReadReceipt(current, payload));
     });
 
@@ -468,7 +647,9 @@ export function ChatClient() {
     const refresh = () => {
       void refreshMessages()
         .then((payload) => {
-          markLatestVisibleMessageAsRead(payload.messages);
+          if (payload) {
+            markLatestVisibleMessageAsRead(payload.messages);
+          }
         })
         .catch(() => {
           // Ignore background refresh errors; realtime may still be active.
@@ -789,12 +970,26 @@ export function ChatClient() {
           onScroll={(event) => {
             shouldAutoScrollRef.current = isNearBottom(event.currentTarget);
 
+            if (event.currentTarget.scrollTop < 140 && olderCursor && !loadingOlder) {
+              void loadOlderMessages();
+            }
+
             if (shouldAutoScrollRef.current) {
               markLatestVisibleMessageAsRead(messages);
             }
           }}
         >
           <div className="chatThread">
+            {olderCursor ? (
+              <button
+                type="button"
+                className="chatLoadMoreButton"
+                onClick={() => void loadOlderMessages()}
+                disabled={loadingOlder}
+              >
+                {loadingOlder ? "Загружаем историю…" : "Показать более старые"}
+              </button>
+            ) : null}
             {groupedMessages.map((group, groupIndex) => (
               <div key={`${group.dayKey}-${group.sender.id}-${groupIndex}`} className="chatDayBlock">
                 {groupIndex === 0 || groupedMessages[groupIndex - 1]?.dayKey !== group.dayKey ? (
@@ -814,6 +1009,7 @@ export function ChatClient() {
                     {group.items.map((message, itemIndex) => {
                       const isFirst = itemIndex === 0;
                       const isLast = itemIndex === group.items.length - 1;
+                      const showUnreadDivider = firstUnreadMessageId === message.id;
                       const readByOthers = (message.readByUserIds ?? []).filter(
                         (userId) => userId !== message.senderUserId,
                       );
@@ -825,6 +1021,11 @@ export function ChatClient() {
                           className={`chatRow ${group.isOwn ? "isOwn" : "isOther"}`}
                           data-message-id={message.id}
                         >
+                          {showUnreadDivider ? (
+                            <div className="chatUnreadDivider">
+                              <span>Непрочитанные</span>
+                            </div>
+                          ) : null}
                           <article
                             className={`chatBubble tone-${group.tone} ${isFirst ? "isFirst" : ""} ${isLast ? "isLast hasTail" : ""}`}
                             data-own={group.isOwn}
@@ -952,9 +1153,19 @@ export function ChatClient() {
                     >
                       {emoji}
                     </button>
-                  ))}
-                </div>
-              </div>
+            ))}
+            {newerCursor ? (
+              <button
+                type="button"
+                className="chatLoadMoreButton isNewer"
+                onClick={() => void loadNewerMessages()}
+                disabled={loadingNewer}
+              >
+                {loadingNewer ? "Загружаем новые…" : "Показать более новые"}
+              </button>
+            ) : null}
+          </div>
+        </div>
             ) : null}
             <button
               type="button"
